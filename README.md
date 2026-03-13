@@ -64,3 +64,29 @@ Comandi admin:
 
 Il bot riconosce "ristoratore" o "Partita IVA" e propone lo sconto professionale del 15%.
 Puoi anche attivarlo con `/b2b`.
+
+## Multi-lingua
+
+Auto-detect IT/EN/DE e comando `/lingua it|en|de`.
+
+## Tracking
+
+Admin: `/tracking_add <order_id>|<carrier>|<code>|<status>|<url>`
+Utente: `/tracking <order_id>`
+
+## FAQ dinamiche
+
+Admin: `/faq_add <keyword>|<risposta>` e `/faq_list`
+
+## Promo stagionali
+
+Admin: `/promo_set <stagione>|<testo>`
+
+## Checkout
+
+Se configuri `STRIPE_SECRET_KEY`, puoi generare link pagamento con `/checkout <importo>`.
+Per crypto, usa `/crypto_set <network>|<address>` e il bot invia istruzioni.
+
+## CRM leggero
+
+Il bot salva preferenze (Moraiolo/Frantoio) e storico ordini in `data/customers.json`.

@@ -2,6 +2,7 @@ import asyncio
 import csv
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -10,6 +11,11 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
+
+try:
+    import stripe  # type: ignore
+except Exception:
+    stripe = None
 
 
 @dataclass
@@ -38,12 +44,18 @@ SHIPPING_FILE = os.path.join(DATA_DIR, "shipping.json")
 COMPANY_FILE = os.path.join(DATA_DIR, "company.json")
 PAYMENTS_FILE = os.path.join(DATA_DIR, "payments_methods.json")
 CUSTOMERS_FILE = os.path.join(DATA_DIR, "customers.json")
+FAQ_FILE = os.path.join(DATA_DIR, "faq.json")
+CRYPTO_FILE = os.path.join(DATA_DIR, "crypto_addresses.json")
+SEASONAL_FILE = os.path.join(DATA_DIR, "seasonal_promos.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.jsonl")
 PAYMENTS_LOG_FILE = os.path.join(DATA_DIR, "payments.jsonl")
+SHIPMENTS_FILE = os.path.join(DATA_DIR, "shipments.json")
 
 FREE_SHIPPING_MIN = float(os.getenv("FREE_SHIPPING_MIN", "100"))
 DEFAULT_SHIPPING = float(os.getenv("DEFAULT_SHIPPING", "14"))
 B2B_DISCOUNT = float(os.getenv("B2B_DISCOUNT", "15"))
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "eur").strip().lower()
 
 PROMO_MESSAGE = (
     "Oro Naturale - EVO artigianale dall'Umbria.\n"
@@ -93,6 +105,88 @@ SHIPPING_FLOW = (
     f"{FREE_SHIPPING_MIN}. "
     "Calcola con /spedizione <PAESE> <totale>."
 )
+
+LANGS = ["it", "en", "de"]
+
+TEXTS = {
+    "it": {
+        "welcome": WELCOME_MESSAGE,
+        "order_quick": ORDER_QUICK_REPLY,
+        "order_template": ORDER_TEMPLATE,
+        "order_received": "Ordine ricevuto. Ti rispondo a breve con totale e pagamento.",
+        "shipping_flow": SHIPPING_FLOW,
+        "payment_flow": PAYMENT_FLOW,
+        "ask_lang": "Lingua impostata.",
+        "b2b_ack": f"Grazie. Per professionisti applico uno sconto del {B2B_DISCOUNT}%.",
+        "faq_title": "Domande frequenti:",
+    },
+    "en": {
+        "welcome": (
+            "Hi, I am Oro Naturale virtual consultant.\n"
+            "I help you choose artisan EVO oils from Umbria for kitchen and table.\n"
+            "Tell me if you prefer intense (Moraiolo) or delicate (Frantoio).\n"
+            "If you are a business with VAT, I apply a 15% discount."
+        ),
+        "order_quick": (
+            "Great, I can help with your order.\n"
+            "Please share:\n"
+            "- Products and quantities\n"
+            "- Delivery country/city\n"
+            "You can use /ordine_invia <details>."
+        ),
+        "order_template": (
+            "To place the order, please send:\n"
+            "- Full name\n"
+            "- Full address (street, number, ZIP, city, country)\n"
+            "- Email (receipt)\n"
+            "- Phone (optional)\n"
+            "- Products and quantities\n"
+            "I will reply with total, shipping and payment instructions."
+        ),
+        "order_received": "Order received. I will reply shortly with total and payment.",
+        "shipping_flow": (
+            f"Free shipping from EUR {FREE_SHIPPING_MIN}. "
+            "Use /spedizione <COUNTRY> <total>."
+        ),
+        "payment_flow": "I will send a secure link or instructions. See /pagamenti.",
+        "ask_lang": "Language set.",
+        "b2b_ack": f"Thanks. For businesses I apply a {B2B_DISCOUNT}% discount.",
+        "faq_title": "FAQ:",
+    },
+    "de": {
+        "welcome": (
+            "Hallo, ich bin der virtuelle Berater von Oro Naturale.\n"
+            "Ich helfe dir, handwerkliche EVO-Öle aus Umbrien auszuwählen.\n"
+            "Magst du intensiv (Moraiolo) oder mild (Frantoio)?\n"
+            "Für Geschäftskunden mit USt-IdNr. gibt es 15% Rabatt."
+        ),
+        "order_quick": (
+            "Gerne helfe ich mit der Bestellung.\n"
+            "Bitte sende:\n"
+            "- Produkte und Mengen\n"
+            "- Lieferland/Stadt\n"
+            "Du kannst /ordine_invia <details> nutzen."
+        ),
+        "order_template": (
+            "Für die Bestellung brauche ich:\n"
+            "- Vor- und Nachname\n"
+            "- Vollständige Adresse\n"
+            "- E-Mail (Beleg)\n"
+            "- Telefon (optional)\n"
+            "- Produkte und Mengen\n"
+            "Ich antworte mit Gesamtbetrag, Versand und Zahlung."
+        ),
+        "order_received": "Bestellung erhalten. Ich melde mich mit Gesamtbetrag und Zahlung.",
+        "shipping_flow": (
+            f"Versand kostenlos ab EUR {FREE_SHIPPING_MIN}. "
+            "Nutze /spedizione <LAND> <gesamt>."
+        ),
+        "payment_flow": "Ich sende einen sicheren Link oder Anweisungen. Siehe /pagamenti.",
+        "ask_lang": "Sprache gesetzt.",
+        "b2b_ack": f"Danke. Fuer Geschaeftskunden gibt es {B2B_DISCOUNT}% Rabatt.",
+        "faq_title": "FAQ:",
+    },
+}
 
 CATEGORY_LABELS = {
     "extra_virgin_olive_oil": "Olio Extravergine di Oliva",
@@ -342,6 +436,142 @@ def format_payment_methods(methods: List[str]) -> str:
     return "\n".join(lines)
 
 
+def load_faq() -> Dict[str, str]:
+    if not os.path.exists(FAQ_FILE):
+        return {
+            "conservazione": "Conserva l'olio in luogo fresco e buio, lontano da fonti di calore.",
+            "abbinamenti": "Moraiolo per piatti robusti, Frantoio per piatti delicati.",
+            "biologico": "I nostri oli bio sono certificati e tracciati.",
+            "certificazioni": "Disponiamo di certificazioni di filiera e bio dove indicato.",
+        }
+    with open(FAQ_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_faq(faq: Dict[str, str]) -> None:
+    ensure_data_dir()
+    with open(FAQ_FILE, "w", encoding="utf-8") as f:
+        json.dump(faq, f, ensure_ascii=False, indent=2)
+
+
+def load_crypto_addresses() -> Dict[str, str]:
+    if not os.path.exists(CRYPTO_FILE):
+        return {}
+    with open(CRYPTO_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_crypto_addresses(data: Dict[str, str]) -> None:
+    ensure_data_dir()
+    with open(CRYPTO_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def load_seasonal_promos() -> Dict[str, str]:
+    if not os.path.exists(SEASONAL_FILE):
+        return {
+            "christmas": "Promo Natale: gift box e oli speciali. Chiedimi il catalogo.",
+            "easter": "Promo Pasqua: selezione oli e vini per la tavola.",
+            "summer": "Promo Estate: oli leggeri e aromatizzati.",
+        }
+    with open(SEASONAL_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_seasonal_promos(data: Dict[str, str]) -> None:
+    ensure_data_dir()
+    with open(SEASONAL_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_lang(user_id: Optional[int]) -> str:
+    if user_id is None:
+        return "it"
+    record = customers_cache.get(str(user_id), {})
+    return record.get("lang", "it")
+
+
+def set_lang(user_id: int, lang: str) -> None:
+    record = customers_cache.get(str(user_id), {})
+    record["lang"] = lang
+    customers_cache[str(user_id)] = record
+    save_customers(customers_cache)
+
+
+def t(user_id: Optional[int], key: str) -> str:
+    lang = get_lang(user_id)
+    return TEXTS.get(lang, TEXTS["it"]).get(key, TEXTS["it"].get(key, ""))
+
+
+def detect_language(text: str) -> Optional[str]:
+    t_ = text.lower()
+    if any(k in t_ for k in ["hallo", "bestellung", "versand", "zahlung"]):
+        return "de"
+    if any(k in t_ for k in ["hello", "order", "shipping", "payment"]):
+        return "en"
+    if any(k in t_ for k in ["ciao", "ordine", "spedizione", "pagamento"]):
+        return "it"
+    return None
+
+
+def parse_total(text: str) -> Optional[float]:
+    m = re.search(r"(totale|total|gesamt)[^0-9]*([0-9]+([.,][0-9]+)?)", text, re.I)
+    if not m:
+        m = re.search(r"([0-9]+([.,][0-9]+)?)\s*(eur|€)", text, re.I)
+    if not m:
+        return None
+    value = m.group(2).replace(",", ".")
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def parse_country(text: str) -> Optional[str]:
+    m = re.search(r"(paese|country|land)[^A-Za-z]*([A-Za-z]{2,})", text, re.I)
+    if m:
+        return m.group(2).upper()
+    for code in shipping_rules.keys():
+        if code.lower() in text.lower():
+            return code
+    return None
+
+
+def compute_upsell_suggestions(total: float) -> List[Product]:
+    gap = FREE_SHIPPING_MIN - total
+    if gap <= 0:
+        return []
+    items: List[Tuple[Product, float]] = []
+    for p in products_cache:
+        if not p.price:
+            continue
+        try:
+            price = float(p.price.replace(",", "."))
+        except ValueError:
+            continue
+        items.append((p, price))
+    items.sort(key=lambda x: x[1])
+    suggestions = []
+    for p, price in items:
+        if price <= gap + 5:
+            suggestions.append(p)
+        if len(suggestions) >= 3:
+            break
+    return suggestions
+
+
+def current_seasonal_promo(promos: Dict[str, str]) -> str:
+    tm = time.localtime()
+    month = tm.tm_mon
+    if month in [12, 1]:
+        return promos.get("christmas", PROMO_MESSAGE)
+    if month in [3, 4]:
+        return promos.get("easter", PROMO_MESSAGE)
+    if month in [6, 7, 8]:
+        return promos.get("summer", PROMO_MESSAGE)
+    return PROMO_MESSAGE
+
+
 def load_customers() -> Dict[str, Dict[str, str]]:
     if not os.path.exists(CUSTOMERS_FILE):
         return {}
@@ -371,6 +601,49 @@ def detect_b2b(text: str) -> bool:
     )
 
 
+def detect_preference(text: str) -> Optional[str]:
+    t = text.lower()
+    if "moraiolo" in t:
+        return "moraiolo"
+    if "frantoio" in t:
+        return "frantoio"
+    return None
+
+
+def parse_payment_method(text: str) -> Optional[str]:
+    t = text.lower()
+    if "carta" in t or "card" in t or "stripe" in t:
+        return "card"
+    if "bonifico" in t or "bank" in t:
+        return "bank"
+    if "crypto" in t or "usdc" in t or "eth" in t or "dai" in t or "sol" in t:
+        return "crypto"
+    return None
+
+
+def create_stripe_payment_link(amount: float, currency: str, description: str) -> Optional[str]:
+    if not STRIPE_SECRET_KEY or stripe is None:
+        return None
+    stripe.api_key = STRIPE_SECRET_KEY
+    cents = int(round(amount * 100))
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[
+            {
+                "price_data": {
+                    "currency": currency,
+                    "product_data": {"name": description or "Oro Naturale order"},
+                    "unit_amount": cents,
+                },
+                "quantity": 1,
+            }
+        ],
+        success_url="https://biomarketshop.com",
+        cancel_url="https://biomarketshop.com",
+    )
+    return session.url
+
+
 products_cache = load_products(PRODUCTS_CSV) + load_custom_products()
 promo_tasks: Dict[int, asyncio.Task] = {}
 skills_cache = load_skills()
@@ -378,6 +651,9 @@ shipping_rules = load_shipping_rules()
 company_info = load_company_info()
 payment_methods = load_payment_methods()
 customers_cache = load_customers()
+faq_cache = load_faq()
+crypto_cache = load_crypto_addresses()
+seasonal_promos = load_seasonal_promos()
 
 
 dp = Dispatcher()
@@ -386,7 +662,7 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        WELCOME_MESSAGE
+        t(message.from_user.id if message.from_user else None, "welcome")
         + "\n\nComandi:\n"
         "/catalogo - tutti i prodotti\n"
         "/olio - extravergini\n"
@@ -405,6 +681,10 @@ async def cmd_start(message: Message) -> None:
         "/contatti - info azienda\n"
         "/pagamenti - metodi di pagamento\n"
         "/b2b - attiva sconto professionale\n"
+        "/listino_b2b - listino professionale\n"
+        "/tracking <order_id>\n"
+        "/lingua <it|en|de>\n"
+        "/faq\n"
         "/admin - pannello admin (solo admin)"
     )
 
@@ -423,6 +703,19 @@ async def cmd_catalogo(message: Message) -> None:
 @dp.message(Command("olio"))
 async def cmd_olio(message: Message) -> None:
     oils = [p for p in products_cache if p.category == "extra_virgin_olive_oil"]
+    if message.from_user:
+        record = customers_cache.get(str(message.from_user.id), {})
+        if record.get("type") == "b2b":
+            lines = []
+            for p in oils:
+                try:
+                    price = float(p.price.replace(",", "."))
+                    disc = price * (1 - B2B_DISCOUNT / 100.0)
+                    lines.append(f"- {p.name} - EUR {disc:.2f} (B2B)")
+                except Exception:
+                    lines.append(f"- {p.name} - EUR {p.price}")
+            await message.answer("Listino B2B oli:\n" + "\n".join(lines))
+            return
     await message.answer(
         "Oli extravergine disponibili:\n" + format_products(oils, limit=12)
     )
@@ -460,12 +753,12 @@ async def cmd_gift(message: Message) -> None:
 
 @dp.message(Command("promo"))
 async def cmd_promo(message: Message) -> None:
-    await message.answer(PROMO_MESSAGE)
+    await message.answer(current_seasonal_promo(seasonal_promos))
 
 
 async def promo_loop(bot: Bot, chat_id: int, hours: float) -> None:
     while True:
-        await bot.send_message(chat_id, PROMO_MESSAGE)
+        await bot.send_message(chat_id, current_seasonal_promo(seasonal_promos))
         await asyncio.sleep(max(1.0, hours) * 3600)
 
 
@@ -499,7 +792,11 @@ async def cmd_promo_off(message: Message) -> None:
 @dp.message(Command("ordine"))
 async def cmd_ordine(message: Message) -> None:
     await message.answer(
-        ORDER_TEMPLATE + "\n\n" + ORDER_SEND_HINT + "\n\n" + SHIPPING_FLOW
+        t(message.from_user.id if message.from_user else None, "order_template")
+        + "\n\n"
+        + ORDER_SEND_HINT
+        + "\n\n"
+        + t(message.from_user.id if message.from_user else None, "shipping_flow")
     )
 
 
@@ -509,22 +806,63 @@ async def cmd_ordine_invia(message: Message) -> None:
     if not details:
         await message.answer("Uso: /ordine_invia <dettagli ordine>")
         return
+    total = parse_total(details or "")
+    country = parse_country(details or "")
+    order_id = f"ON{int(time.time())}"
     payload = {
+        "order_id": order_id,
         "ts": int(time.time()),
         "user_id": message.from_user.id if message.from_user else None,
         "username": message.from_user.username if message.from_user else None,
         "chat_id": message.chat.id,
         "details": details,
+        "total": total,
+        "country": country,
     }
     append_jsonl(ORDERS_FILE, payload)
-    await message.answer(
-        "Ordine ricevuto. Ti rispondo a breve con totale e pagamento."
-    )
+    reply = t(message.from_user.id if message.from_user else None, "order_received")
+    if message.from_user:
+        record = customers_cache.get(str(message.from_user.id), {})
+        if record.get("type") == "b2b" and total:
+            discounted = total * (1 - B2B_DISCOUNT / 100.0)
+            reply += f"\nTotale B2B: EUR {discounted:.2f}"
+    await message.answer(reply)
+    if message.from_user:
+        record = customers_cache.get(str(message.from_user.id), {})
+        history = record.get("orders", [])
+        history.append({"order_id": order_id, "total": total})
+        record["orders"] = history[-10:]
+        customers_cache[str(message.from_user.id)] = record
+        save_customers(customers_cache)
+    if total:
+        suggestions = compute_upsell_suggestions(total)
+        if suggestions:
+            await message.answer(
+                "Se aggiungi un prodotto arrivi alla spedizione gratuita:\n"
+                + format_products(suggestions, limit=3)
+            )
+        method = parse_payment_method(details or "")
+        if method == "card" and STRIPE_SECRET_KEY:
+            link = create_stripe_payment_link(
+                total, STRIPE_CURRENCY, f"Oro Naturale order {order_id}"
+            )
+            if link:
+                await message.answer(
+                    "Ecco il link di pagamento con carta:\n" + link
+                )
+        if method == "crypto" and crypto_cache:
+            lines = ["Pagamento crypto disponibile:"]
+            for net, addr in crypto_cache.items():
+                lines.append(f"- {net}: {addr}")
+            await message.answer("\n".join(lines))
     for admin_id in ADMIN_IDS:
         await message.bot.send_message(
             admin_id,
             "Nuovo ordine:\n"
+            f"ID: {order_id}\n"
             f"Utente: @{payload.get('username')}\n"
+            f"Totale: {total}\n"
+            f"Paese: {country}\n"
             f"Dettagli: {details}",
         )
 
@@ -592,6 +930,71 @@ async def cmd_b2b(message: Message) -> None:
     )
 
 
+@dp.message(Command("listino_b2b"))
+async def cmd_listino_b2b(message: Message) -> None:
+    if not message.from_user:
+        return
+    record = customers_cache.get(str(message.from_user.id), {})
+    if record.get("type") != "b2b":
+        await message.answer("Listino disponibile solo per ristoratori/Partita IVA.")
+        return
+    oils = [p for p in products_cache if p.category == "extra_virgin_olive_oil"]
+    lines = []
+    for p in oils:
+        try:
+            price = float(p.price.replace(",", "."))
+            disc = price * (1 - B2B_DISCOUNT / 100.0)
+            lines.append(f"- {p.name} - EUR {disc:.2f} (B2B)")
+        except Exception:
+            lines.append(f"- {p.name} - EUR {p.price}")
+    lines.append("Formati 5L/10L disponibili su richiesta.")
+    await message.answer("Listino B2B:\n" + "\n".join(lines))
+
+
+@dp.message(Command("lingua"))
+async def cmd_lingua(message: Message) -> None:
+    parts = message.text.split() if message.text else []
+    if len(parts) < 2 or parts[1] not in LANGS:
+        await message.answer("Uso: /lingua it|en|de")
+        return
+    if message.from_user:
+        set_lang(message.from_user.id, parts[1])
+    await message.answer(t(message.from_user.id if message.from_user else None, "ask_lang"))
+
+
+@dp.message(Command("faq"))
+async def cmd_faq(message: Message) -> None:
+    lines = [t(message.from_user.id if message.from_user else None, "faq_title")]
+    for k in sorted(faq_cache.keys()):
+        lines.append(f"- {k}")
+    await message.answer("\n".join(lines))
+
+
+@dp.message(Command("tracking"))
+async def cmd_tracking(message: Message) -> None:
+    parts = message.text.split(maxsplit=1) if message.text else []
+    if len(parts) < 2:
+        await message.answer("Uso: /tracking <order_id>")
+        return
+    order_id = parts[1].strip()
+    if not os.path.exists(SHIPMENTS_FILE):
+        await message.answer("Tracking non disponibile.")
+        return
+    with open(SHIPMENTS_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    entry = data.get(order_id)
+    if not entry:
+        await message.answer("Nessuna spedizione trovata per questo ordine.")
+        return
+    await message.answer(
+        f"Tracking {order_id}:\n"
+        f"Corriere: {entry.get('carrier')}\n"
+        f"Codice: {entry.get('code')}\n"
+        f"Stato: {entry.get('status')}\n"
+        f"Link: {entry.get('url')}"
+    )
+
+
 @dp.message(Command("admin"))
 async def cmd_admin(message: Message) -> None:
     if not is_admin(message):
@@ -614,6 +1017,16 @@ async def cmd_admin(message: Message) -> None:
         "/pagamento_add <metodo>\n"
         "/pagamento_del <metodo>\n"
         "/pagamento_list\n"
+        "/tracking_add <order_id>|<carrier>|<code>|<status>|<url>\n"
+        "/tracking_del <order_id>\n"
+        "/faq_add <keyword>|<risposta>\n"
+        "/faq_del <keyword>\n"
+        "/faq_list\n"
+        "/promo_set <stagione>|<testo>\n"
+        "/crypto_set <network>|<address>\n"
+        "/crypto_list\n"
+        "/checkout <importo> [valuta] [descrizione]\n"
+        "/listino_b2b\n"
         "/reload - ricarica catalogo"
     )
 
@@ -802,7 +1215,12 @@ async def cmd_contatti(message: Message) -> None:
 
 @dp.message(Command("pagamenti"))
 async def cmd_pagamenti(message: Message) -> None:
-    await message.answer(format_payment_methods(payment_methods))
+    text = format_payment_methods(payment_methods)
+    if STRIPE_SECRET_KEY:
+        text += "\n- Carta (Stripe)"
+    if crypto_cache:
+        text += "\n- Crypto (USDC/ETH/DAI)"
+    await message.answer(text)
 
 
 @dp.message(Command("azienda_set"))
@@ -866,6 +1284,166 @@ async def cmd_pagamento_list(message: Message) -> None:
     await message.answer(format_payment_methods(payment_methods))
 
 
+@dp.message(Command("crypto_set"))
+async def cmd_crypto_set(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    text = message.text.replace("/crypto_set", "").strip()
+    parts = [p.strip() for p in text.split("|", 1)]
+    if len(parts) < 2:
+        await message.answer("Uso: /crypto_set <network>|<address>")
+        return
+    network, address = parts
+    crypto_cache[network.lower()] = address
+    save_crypto_addresses(crypto_cache)
+    await message.answer("Indirizzo crypto salvato.")
+
+
+@dp.message(Command("crypto_list"))
+async def cmd_crypto_list(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    if not crypto_cache:
+        await message.answer("Nessun indirizzo crypto salvato.")
+        return
+    lines = [f"- {k}: {v}" for k, v in crypto_cache.items()]
+    await message.answer("Indirizzi crypto:\n" + "\n".join(lines))
+
+
+@dp.message(Command("checkout"))
+async def cmd_checkout(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    parts = message.text.split(maxsplit=2) if message.text else []
+    if len(parts) < 2:
+        await message.answer("Uso: /checkout <importo> [valuta] [descrizione]")
+        return
+    try:
+        amount = float(parts[1])
+    except ValueError:
+        await message.answer("Importo non valido.")
+        return
+    currency = STRIPE_CURRENCY
+    description = "Oro Naturale order"
+    if len(parts) >= 3:
+        description = parts[2]
+    link = create_stripe_payment_link(amount, currency, description)
+    if not link:
+        await message.answer("Stripe non configurato. Imposta STRIPE_SECRET_KEY.")
+        return
+    await message.answer(f"Link pagamento: {link}")
+
+
+@dp.message(Command("tracking_add"))
+async def cmd_tracking_add(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    text = message.text.replace("/tracking_add", "").strip()
+    parts = [p.strip() for p in text.split("|")]
+    if len(parts) < 5:
+        await message.answer(
+            "Uso: /tracking_add <order_id>|<carrier>|<code>|<status>|<url>"
+        )
+        return
+    order_id, carrier, code, status, url = parts[:5]
+    data = {}
+    if os.path.exists(SHIPMENTS_FILE):
+        with open(SHIPMENTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    data[order_id] = {
+        "carrier": carrier,
+        "code": code,
+        "status": status,
+        "url": url,
+    }
+    ensure_data_dir()
+    with open(SHIPMENTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    await message.answer("Tracking salvato.")
+
+
+@dp.message(Command("tracking_del"))
+async def cmd_tracking_del(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    order_id = message.text.replace("/tracking_del", "").strip()
+    if not order_id:
+        await message.answer("Uso: /tracking_del <order_id>")
+        return
+    if not os.path.exists(SHIPMENTS_FILE):
+        await message.answer("Nessun tracking presente.")
+        return
+    with open(SHIPMENTS_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    data.pop(order_id, None)
+    with open(SHIPMENTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    await message.answer("Tracking rimosso (se presente).")
+
+
+@dp.message(Command("faq_add"))
+async def cmd_faq_add(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    text = message.text.replace("/faq_add", "").strip()
+    parts = [p.strip() for p in text.split("|", 1)]
+    if len(parts) < 2:
+        await message.answer("Uso: /faq_add <keyword>|<risposta>")
+        return
+    key, answer = parts
+    faq_cache[key.lower()] = answer
+    save_faq(faq_cache)
+    await message.answer("FAQ aggiunta.")
+
+
+@dp.message(Command("faq_del"))
+async def cmd_faq_del(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    key = message.text.replace("/faq_del", "").strip().lower()
+    if not key:
+        await message.answer("Uso: /faq_del <keyword>")
+        return
+    faq_cache.pop(key, None)
+    save_faq(faq_cache)
+    await message.answer("FAQ rimossa (se presente).")
+
+
+@dp.message(Command("faq_list"))
+async def cmd_faq_list(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    if not faq_cache:
+        await message.answer("Nessuna FAQ salvata.")
+        return
+    lines = [f"- {k}" for k in sorted(faq_cache.keys())]
+    await message.answer("FAQ:\n" + "\n".join(lines))
+
+
+@dp.message(Command("promo_set"))
+async def cmd_promo_set(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    text = message.text.replace("/promo_set", "").strip()
+    parts = [p.strip() for p in text.split("|", 1)]
+    if len(parts) < 2:
+        await message.answer("Uso: /promo_set <stagione>|<testo>")
+        return
+    season, text_msg = parts
+    seasonal_promos[season] = text_msg
+    save_seasonal_promos(seasonal_promos)
+    await message.answer("Promo stagionale aggiornata.")
+
+
 @dp.message(Command("reload"))
 async def cmd_reload(message: Message) -> None:
     if not is_admin(message):
@@ -879,19 +1457,35 @@ async def cmd_reload(message: Message) -> None:
 @dp.message(F.text)
 async def on_text(message: Message) -> None:
     keyword = extract_keywords(message.text or "")
+    lang_guess = detect_language(message.text or "")
+    if lang_guess and message.from_user:
+        current = customers_cache.get(str(message.from_user.id), {}).get("lang")
+        if not current:
+            set_lang(message.from_user.id, lang_guess)
     if detect_b2b(message.text or "") and message.from_user:
         customers_cache[str(message.from_user.id)] = {"type": "b2b"}
         save_customers(customers_cache)
         await message.answer(
-            f"Grazie. Per professionisti applico uno sconto del {B2B_DISCOUNT}%.\n"
+            t(message.from_user.id if message.from_user else None, "b2b_ack")
+            + "\n"
             "Se vuoi applicarlo, inviami Partita IVA e nome azienda."
         )
         return
+    pref = detect_preference(message.text or "")
+    if pref and message.from_user:
+        record = customers_cache.get(str(message.from_user.id), {})
+        record["preference"] = pref
+        customers_cache[str(message.from_user.id)] = record
+        save_customers(customers_cache)
     if keyword == "catalogo":
         await cmd_catalogo(message)
         return
     if keyword == "order_quick":
-        await message.answer(ORDER_QUICK_REPLY + "\n\n" + PAYMENT_FLOW)
+        await message.answer(
+            t(message.from_user.id if message.from_user else None, "order_quick")
+            + "\n\n"
+            + t(message.from_user.id if message.from_user else None, "payment_flow")
+        )
         return
     if keyword == "olio":
         await cmd_olio(message)
@@ -909,7 +1503,7 @@ async def on_text(message: Message) -> None:
         await cmd_gift(message)
         return
     if keyword == "spedizione":
-        await message.answer(SHIPPING_FLOW)
+        await message.answer(t(message.from_user.id if message.from_user else None, "shipping_flow"))
         return
     if keyword == "ordine":
         details = message.text
@@ -934,7 +1528,11 @@ async def on_text(message: Message) -> None:
                 )
         else:
             await message.answer(
-                ORDER_TEMPLATE + "\n\n" + SHIPPING_FLOW + "\n\n" + PAYMENT_FLOW
+                t(message.from_user.id if message.from_user else None, "order_template")
+                + "\n\n"
+                + t(message.from_user.id if message.from_user else None, "shipping_flow")
+                + "\n\n"
+                + t(message.from_user.id if message.from_user else None, "payment_flow")
             )
         return
     if keyword == "prezzi":
@@ -945,6 +1543,12 @@ async def on_text(message: Message) -> None:
     if skills_cache:
         text = (message.text or "").lower()
         for key, answer in skills_cache.items():
+            if key in text:
+                await message.answer(answer)
+                return
+    if faq_cache:
+        text = (message.text or "").lower()
+        for key, answer in faq_cache.items():
             if key in text:
                 await message.answer(answer)
                 return
