@@ -59,3 +59,8 @@ Comandi admin:
 - `/reload` ricarica catalogo
  - `/azienda_set <campo>|<valore>` aggiorna contatti azienda
  - `/pagamento_add <metodo>` aggiorna metodi pagamento
+
+## B2B
+
+Il bot riconosce "ristoratore" o "Partita IVA" e propone lo sconto professionale del 15%.
+Puoi anche attivarlo con `/b2b`.

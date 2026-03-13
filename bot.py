@@ -37,6 +37,7 @@ SKILLS_FILE = os.path.join(DATA_DIR, "skills.json")
 SHIPPING_FILE = os.path.join(DATA_DIR, "shipping.json")
 COMPANY_FILE = os.path.join(DATA_DIR, "company.json")
 PAYMENTS_FILE = os.path.join(DATA_DIR, "payments_methods.json")
+CUSTOMERS_FILE = os.path.join(DATA_DIR, "customers.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.jsonl")
 PAYMENTS_LOG_FILE = os.path.join(DATA_DIR, "payments.jsonl")
 
@@ -51,6 +52,13 @@ PROMO_MESSAGE = (
     "Dimmi l'occasione e ti consiglio l'olio giusto."
 )
 
+WELCOME_MESSAGE = (
+    "Ciao, sono il consulente virtuale Oro Naturale.\n"
+    "Ti aiuto a scegliere oli EVO artigianali dall'Umbria per cucina e tavola.\n"
+    "Dimmi se cerchi un profilo intenso (Moraiolo) o delicato (Frantoio).\n"
+    "Se sei ristoratore o hai Partita IVA applico uno sconto del 15%."
+)
+
 ORDER_TEMPLATE = (
     "Per preparare l'ordine, inviami:\n"
     "- Nome e Cognome\n"
@@ -58,13 +66,32 @@ ORDER_TEMPLATE = (
     "- Email (per ricevuta)\n"
     "- Telefono (opzionale)\n"
     "- Prodotti e quantita\n"
-    "Ti rispondo con totale e istruzioni di pagamento."
+    "Ti rispondo con totale, spedizione e istruzioni di pagamento."
 )
 
 ORDER_SEND_HINT = (
     "Puoi inviare i dettagli con:\n"
     "/ordine_invia <dettagli>\n"
     "oppure scrivendo un messaggio che contiene 'ordine:'"
+)
+
+ORDER_QUICK_REPLY = (
+    "Perfetto, ti aiuto subito con l'ordine.\n"
+    "Dimmi:\n"
+    "- Prodotti e quantita\n"
+    "- Paese/citta di consegna\n"
+    "Se vuoi, puoi usare /ordine_invia <dettagli>."
+)
+
+PAYMENT_FLOW = (
+    "Per il pagamento ti invio un link sicuro o le istruzioni in base al metodo scelto.\n"
+    "Vedi i metodi con /pagamenti."
+)
+
+SHIPPING_FLOW = (
+    "Spedizione gratuita da EUR "
+    f"{FREE_SHIPPING_MIN}. "
+    "Calcola con /spedizione <PAESE> <totale>."
 )
 
 CATEGORY_LABELS = {
@@ -188,6 +215,8 @@ def extract_keywords(text: str) -> str:
     t = text.lower()
     if "catalogo" in t or "prodotti" in t:
         return "catalogo"
+    if "voglio fare un ordine" in t or "fare un ordine" in t:
+        return "order_quick"
     if "olio" in t:
         return "olio"
     if "aromat" in t:
@@ -205,6 +234,7 @@ def extract_keywords(text: str) -> str:
     if "ordine" in t or "compr" in t:
         return "ordine"
     return ""
+
 
 def load_skills() -> Dict[str, str]:
     if not os.path.exists(SKILLS_FILE):
@@ -312,12 +342,42 @@ def format_payment_methods(methods: List[str]) -> str:
     return "\n".join(lines)
 
 
+def load_customers() -> Dict[str, Dict[str, str]]:
+    if not os.path.exists(CUSTOMERS_FILE):
+        return {}
+    with open(CUSTOMERS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_customers(customers: Dict[str, Dict[str, str]]) -> None:
+    ensure_data_dir()
+    with open(CUSTOMERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(customers, f, ensure_ascii=False, indent=2)
+
+
+def detect_b2b(text: str) -> bool:
+    t = text.lower()
+    return any(
+        k in t
+        for k in [
+            "ristoratore",
+            "ristorante",
+            "partita iva",
+            "p.iva",
+            "p iva",
+            "azienda",
+            "fornitura",
+        ]
+    )
+
+
 products_cache = load_products(PRODUCTS_CSV) + load_custom_products()
 promo_tasks: Dict[int, asyncio.Task] = {}
 skills_cache = load_skills()
 shipping_rules = load_shipping_rules()
 company_info = load_company_info()
 payment_methods = load_payment_methods()
+customers_cache = load_customers()
 
 
 dp = Dispatcher()
@@ -326,8 +386,8 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        "Benvenuto su Oro Naturale.\n"
-        "Comandi:\n"
+        WELCOME_MESSAGE
+        + "\n\nComandi:\n"
         "/catalogo - tutti i prodotti\n"
         "/olio - extravergini\n"
         "/aromatizzati - oli aromatizzati\n"
@@ -344,6 +404,7 @@ async def cmd_start(message: Message) -> None:
         "/pagato <dettagli> - conferma pagamento\n"
         "/contatti - info azienda\n"
         "/pagamenti - metodi di pagamento\n"
+        "/b2b - attiva sconto professionale\n"
         "/admin - pannello admin (solo admin)"
     )
 
@@ -437,7 +498,9 @@ async def cmd_promo_off(message: Message) -> None:
 
 @dp.message(Command("ordine"))
 async def cmd_ordine(message: Message) -> None:
-    await message.answer(ORDER_TEMPLATE + "\n\n" + ORDER_SEND_HINT)
+    await message.answer(
+        ORDER_TEMPLATE + "\n\n" + ORDER_SEND_HINT + "\n\n" + SHIPPING_FLOW
+    )
 
 
 @dp.message(Command("ordine_invia"))
@@ -514,6 +577,18 @@ async def cmd_spedizione(message: Message) -> None:
     cost = shipping_cost_for(country, total, shipping_rules)
     await message.answer(
         f"Spedizione per {country.upper()}: EUR {cost} (gratis da EUR {FREE_SHIPPING_MIN})."
+    )
+
+
+@dp.message(Command("b2b"))
+async def cmd_b2b(message: Message) -> None:
+    if not message.from_user:
+        return
+    customers_cache[str(message.from_user.id)] = {"type": "b2b"}
+    save_customers(customers_cache)
+    await message.answer(
+        f"Perfetto. Attivo sconto professionale {B2B_DISCOUNT}%.\n"
+        "Per applicarlo inviami la Partita IVA e il nome azienda."
     )
 
 
@@ -804,8 +879,19 @@ async def cmd_reload(message: Message) -> None:
 @dp.message(F.text)
 async def on_text(message: Message) -> None:
     keyword = extract_keywords(message.text or "")
+    if detect_b2b(message.text or "") and message.from_user:
+        customers_cache[str(message.from_user.id)] = {"type": "b2b"}
+        save_customers(customers_cache)
+        await message.answer(
+            f"Grazie. Per professionisti applico uno sconto del {B2B_DISCOUNT}%.\n"
+            "Se vuoi applicarlo, inviami Partita IVA e nome azienda."
+        )
+        return
     if keyword == "catalogo":
         await cmd_catalogo(message)
+        return
+    if keyword == "order_quick":
+        await message.answer(ORDER_QUICK_REPLY + "\n\n" + PAYMENT_FLOW)
         return
     if keyword == "olio":
         await cmd_olio(message)
@@ -823,10 +909,7 @@ async def on_text(message: Message) -> None:
         await cmd_gift(message)
         return
     if keyword == "spedizione":
-        await message.answer(
-            "Spedizione gratuita da EUR "
-            f"{FREE_SHIPPING_MIN}. Usa /spedizione <PAESE> <totale>."
-        )
+        await message.answer(SHIPPING_FLOW)
         return
     if keyword == "ordine":
         details = message.text
@@ -850,7 +933,9 @@ async def on_text(message: Message) -> None:
                     f"Dettagli: {details}",
                 )
         else:
-            await message.answer(ORDER_TEMPLATE)
+            await message.answer(
+                ORDER_TEMPLATE + "\n\n" + SHIPPING_FLOW + "\n\n" + PAYMENT_FLOW
+            )
         return
     if keyword == "prezzi":
         await message.answer(
