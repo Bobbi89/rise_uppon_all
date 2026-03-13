@@ -44,3 +44,16 @@ Il bot legge i prodotti da `Product_export.csv`.
    - `ADMIN_CHAT_ID` (opzionale)
    - `PRODUCTS_CSV` (opzionale, default `Product_export.csv`)
 3. Deploy. Railway avvia automaticamente il comando definito in `nixpacks.toml`.
+
+## Admin e gestione
+
+Imposta `ADMIN_CHAT_ID` (anche multipli separati da virgola) per vedere ordini e pagamenti.
+
+Comandi admin:
+- `/admin` pannello comandi
+- `/orders` ultimi ordini
+- `/payments` ultimi pagamenti
+- `/shipping_set <PAESE> <costo>` regole spedizione
+- `/product_add <nome>|<prezzo>|<categoria>|<descrizione>` aggiungi prodotto custom
+- `/skill_add <keyword>|<risposta>` aggiungi risposta rapida
+- `/reload` ricarica catalogo
