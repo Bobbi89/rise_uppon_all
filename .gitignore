@@ -3,6 +3,5 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-.python-version
 .DS_Store
 *.log
