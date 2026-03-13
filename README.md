@@ -57,3 +57,5 @@ Comandi admin:
 - `/product_add <nome>|<prezzo>|<categoria>|<descrizione>` aggiungi prodotto custom
 - `/skill_add <keyword>|<risposta>` aggiungi risposta rapida
 - `/reload` ricarica catalogo
+ - `/azienda_set <campo>|<valore>` aggiorna contatti azienda
+ - `/pagamento_add <metodo>` aggiorna metodi pagamento

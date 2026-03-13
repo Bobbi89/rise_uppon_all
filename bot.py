@@ -35,11 +35,14 @@ DATA_DIR = os.getenv("DATA_DIR", "data")
 CUSTOM_PRODUCTS_FILE = os.path.join(DATA_DIR, "custom_products.json")
 SKILLS_FILE = os.path.join(DATA_DIR, "skills.json")
 SHIPPING_FILE = os.path.join(DATA_DIR, "shipping.json")
+COMPANY_FILE = os.path.join(DATA_DIR, "company.json")
+PAYMENTS_FILE = os.path.join(DATA_DIR, "payments_methods.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.jsonl")
-PAYMENTS_FILE = os.path.join(DATA_DIR, "payments.jsonl")
+PAYMENTS_LOG_FILE = os.path.join(DATA_DIR, "payments.jsonl")
 
 FREE_SHIPPING_MIN = float(os.getenv("FREE_SHIPPING_MIN", "100"))
 DEFAULT_SHIPPING = float(os.getenv("DEFAULT_SHIPPING", "14"))
+B2B_DISCOUNT = float(os.getenv("B2B_DISCOUNT", "15"))
 
 PROMO_MESSAGE = (
     "Oro Naturale - EVO artigianale dall'Umbria.\n"
@@ -250,10 +253,71 @@ def find_product_by_keyword(products: List[Product], keyword: str) -> List[Produ
     return [p for p in products if k in p.name.lower()]
 
 
+def load_company_info() -> Dict[str, str]:
+    if not os.path.exists(COMPANY_FILE):
+        return {}
+    with open(COMPANY_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_company_info(info: Dict[str, str]) -> None:
+    ensure_data_dir()
+    with open(COMPANY_FILE, "w", encoding="utf-8") as f:
+        json.dump(info, f, ensure_ascii=False, indent=2)
+
+
+def format_company_info(info: Dict[str, str]) -> str:
+    if not info:
+        return "Contatti non disponibili. Scrivi all'admin."
+    parts = []
+    if info.get("name"):
+        parts.append(info["name"])
+    if info.get("website"):
+        parts.append(f"Sito: {info['website']}")
+    if info.get("email"):
+        parts.append(f"Email: {info['email']}")
+    if info.get("phone"):
+        parts.append(f"Telefono: {info['phone']}")
+    if info.get("whatsapp"):
+        parts.append(f"WhatsApp: {info['whatsapp']}")
+    if info.get("address"):
+        parts.append(f"Indirizzo: {info['address']}")
+    if info.get("hours"):
+        parts.append(f"Orari: {info['hours']}")
+    if info.get("vat"):
+        parts.append(f"P.IVA: {info['vat']}")
+    return "\n".join(parts)
+
+
+def load_payment_methods() -> List[str]:
+    if not os.path.exists(PAYMENTS_FILE):
+        return []
+    with open(PAYMENTS_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return [str(x) for x in data]
+
+
+def save_payment_methods(methods: List[str]) -> None:
+    ensure_data_dir()
+    with open(PAYMENTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(methods, f, ensure_ascii=False, indent=2)
+
+
+def format_payment_methods(methods: List[str]) -> str:
+    if not methods:
+        return "Metodi di pagamento non disponibili. Scrivi all'admin."
+    lines = ["Metodi di pagamento:"]
+    for m in methods:
+        lines.append(f"- {m}")
+    return "\n".join(lines)
+
+
 products_cache = load_products(PRODUCTS_CSV) + load_custom_products()
 promo_tasks: Dict[int, asyncio.Task] = {}
 skills_cache = load_skills()
 shipping_rules = load_shipping_rules()
+company_info = load_company_info()
+payment_methods = load_payment_methods()
 
 
 dp = Dispatcher()
@@ -278,6 +342,8 @@ async def cmd_start(message: Message) -> None:
         "/promo_off - stop promo automatiche\n"
         "/prezzo <nome> - cerca prezzi\n"
         "/pagato <dettagli> - conferma pagamento\n"
+        "/contatti - info azienda\n"
+        "/pagamenti - metodi di pagamento\n"
         "/admin - pannello admin (solo admin)"
     )
 
@@ -420,7 +486,7 @@ async def cmd_pagato(message: Message) -> None:
         "chat_id": message.chat.id,
         "details": details,
     }
-    append_jsonl(PAYMENTS_FILE, payload)
+    append_jsonl(PAYMENTS_LOG_FILE, payload)
     await message.answer(
         "Grazie. Ho ricevuto la conferma. Ti aggiorno appena verifichiamo."
     )
@@ -468,6 +534,11 @@ async def cmd_admin(message: Message) -> None:
         "/skill_add <keyword>|<risposta>\n"
         "/skill_del <keyword>\n"
         "/skill_list\n"
+        "/azienda_set <campo>|<valore>\n"
+        "/azienda_view\n"
+        "/pagamento_add <metodo>\n"
+        "/pagamento_del <metodo>\n"
+        "/pagamento_list\n"
         "/reload - ricarica catalogo"
     )
 
@@ -507,7 +578,7 @@ async def cmd_payments(message: Message) -> None:
     if not is_admin(message):
         await message.answer("Comando riservato agli admin.")
         return
-    items = tail_jsonl(PAYMENTS_FILE, limit=5)
+    items = tail_jsonl(PAYMENTS_LOG_FILE, limit=5)
     if not items:
         await message.answer("Nessun pagamento registrato.")
         return
@@ -649,6 +720,77 @@ async def cmd_skill_list(message: Message) -> None:
     await message.answer("Skills:\n" + "\n".join(lines))
 
 
+@dp.message(Command("contatti"))
+async def cmd_contatti(message: Message) -> None:
+    await message.answer(format_company_info(company_info))
+
+
+@dp.message(Command("pagamenti"))
+async def cmd_pagamenti(message: Message) -> None:
+    await message.answer(format_payment_methods(payment_methods))
+
+
+@dp.message(Command("azienda_set"))
+async def cmd_azienda_set(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    text = message.text.replace("/azienda_set", "").strip()
+    parts = [p.strip() for p in text.split("|", 1)]
+    if len(parts) < 2:
+        await message.answer("Uso: /azienda_set <campo>|<valore>")
+        return
+    field, value = parts
+    company_info[field] = value
+    save_company_info(company_info)
+    await message.answer("Info azienda aggiornata.")
+
+
+@dp.message(Command("azienda_view"))
+async def cmd_azienda_view(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    await message.answer(format_company_info(company_info))
+
+
+@dp.message(Command("pagamento_add"))
+async def cmd_pagamento_add(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    method = message.text.replace("/pagamento_add", "").strip()
+    if not method:
+        await message.answer("Uso: /pagamento_add <metodo>")
+        return
+    if method not in payment_methods:
+        payment_methods.append(method)
+        save_payment_methods(payment_methods)
+    await message.answer("Metodo di pagamento aggiunto.")
+
+
+@dp.message(Command("pagamento_del"))
+async def cmd_pagamento_del(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    method = message.text.replace("/pagamento_del", "").strip()
+    if not method:
+        await message.answer("Uso: /pagamento_del <metodo>")
+        return
+    payment_methods[:] = [m for m in payment_methods if m != method]
+    save_payment_methods(payment_methods)
+    await message.answer("Metodo di pagamento rimosso (se presente).")
+
+
+@dp.message(Command("pagamento_list"))
+async def cmd_pagamento_list(message: Message) -> None:
+    if not is_admin(message):
+        await message.answer("Comando riservato agli admin.")
+        return
+    await message.answer(format_payment_methods(payment_methods))
+
+
 @dp.message(Command("reload"))
 async def cmd_reload(message: Message) -> None:
     if not is_admin(message):
@@ -682,7 +824,8 @@ async def on_text(message: Message) -> None:
         return
     if keyword == "spedizione":
         await message.answer(
-            "Spedizione gratuita da EUR 100. Dimmi paese e citta per calcolare."
+            "Spedizione gratuita da EUR "
+            f"{FREE_SHIPPING_MIN}. Usa /spedizione <PAESE> <totale>."
         )
         return
     if keyword == "ordine":
