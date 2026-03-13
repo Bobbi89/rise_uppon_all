@@ -663,7 +663,7 @@ dp = Dispatcher()
 async def cmd_start(message: Message) -> None:
     await message.answer(
         t(message.from_user.id if message.from_user else None, "welcome")
-        + "\n\nComandi:\n"
+        + "\n\nPer contatti aziendali usa /contatti.\n\nComandi:\n"
         "/catalogo - tutti i prodotti\n"
         "/olio - extravergini\n"
         "/aromatizzati - oli aromatizzati\n"
