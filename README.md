@@ -35,3 +35,12 @@ python bot.py
 ## Dati
 
 Il bot legge i prodotti da `Product_export.csv`.
+
+## Deploy su Railway
+
+1. Crea un nuovo progetto su Railway e collega questo repo.
+2. Imposta le variabili d'ambiente:
+   - `TELEGRAM_BOT_TOKEN`
+   - `ADMIN_CHAT_ID` (opzionale)
+   - `PRODUCTS_CSV` (opzionale, default `Product_export.csv`)
+3. Deploy. Railway avvia automaticamente il comando definito in `nixpacks.toml`.
