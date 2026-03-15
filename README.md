@@ -90,3 +90,7 @@ Per crypto, usa `/crypto_set <network>|<address>` e il bot invia istruzioni.
 ## CRM leggero
 
 Il bot salva preferenze (Moraiolo/Frantoio) e storico ordini in `data/customers.json`.
+
+## Sales flow
+
+Il bot usa uno stage semplice (qualify, order_collect, payment_pending). Puoi resettare con `/reset`.

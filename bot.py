@@ -498,6 +498,19 @@ def set_lang(user_id: int, lang: str) -> None:
     save_customers(customers_cache)
 
 
+def get_customer(user_id: Optional[int]) -> Dict[str, str]:
+    if user_id is None:
+        return {}
+    return customers_cache.get(str(user_id), {})
+
+
+def update_customer(user_id: int, updates: Dict[str, str]) -> None:
+    record = customers_cache.get(str(user_id), {})
+    record.update(updates)
+    customers_cache[str(user_id)] = record
+    save_customers(customers_cache)
+
+
 def t(user_id: Optional[int], key: str) -> str:
     lang = get_lang(user_id)
     return TEXTS.get(lang, TEXTS["it"]).get(key, TEXTS["it"].get(key, ""))
@@ -644,6 +657,71 @@ def create_stripe_payment_link(amount: float, currency: str, description: str) -
     return session.url
 
 
+def process_order(details: str, message: Message) -> None:
+    total = parse_total(details or "")
+    country = parse_country(details or "")
+    order_id = f"ON{int(time.time())}"
+    payload = {
+        "order_id": order_id,
+        "ts": int(time.time()),
+        "user_id": message.from_user.id if message.from_user else None,
+        "username": message.from_user.username if message.from_user else None,
+        "chat_id": message.chat.id,
+        "details": details,
+        "total": total,
+        "country": country,
+    }
+    append_jsonl(ORDERS_FILE, payload)
+
+    reply = t(message.from_user.id if message.from_user else None, "order_received")
+    if message.from_user:
+        record = get_customer(message.from_user.id)
+        if record.get("type") == "b2b" and total:
+            discounted = total * (1 - B2B_DISCOUNT / 100.0)
+            reply += f"\nTotale B2B: EUR {discounted:.2f}"
+        history = record.get("orders", [])
+        history.append({"order_id": order_id, "total": total})
+        record["orders"] = history[-10:]
+        record["stage"] = "payment_pending"
+        update_customer(message.from_user.id, record)
+
+    async def _send() -> None:
+        await message.answer(reply)
+        if total:
+            suggestions = compute_upsell_suggestions(total)
+            if suggestions:
+                await message.answer(
+                    "Se aggiungi un prodotto arrivi alla spedizione gratuita:\n"
+                    + format_products(suggestions, limit=3)
+                )
+            method = parse_payment_method(details or "")
+            if method == "card" and STRIPE_SECRET_KEY:
+                link = create_stripe_payment_link(
+                    total, STRIPE_CURRENCY, f"Oro Naturale order {order_id}"
+                )
+                if link:
+                    await message.answer(
+                        "Ecco il link di pagamento con carta:\n" + link
+                    )
+            if method == "crypto" and crypto_cache:
+                lines = ["Pagamento crypto disponibile:"]
+                for net, addr in crypto_cache.items():
+                    lines.append(f"- {net}: {addr}")
+                await message.answer("\n".join(lines))
+        for admin_id in ADMIN_IDS:
+            await message.bot.send_message(
+                admin_id,
+                "Nuovo ordine:\n"
+                f"ID: {order_id}\n"
+                f"Utente: @{payload.get('username')}\n"
+                f"Totale: {total}\n"
+                f"Paese: {country}\n"
+                f"Dettagli: {details}",
+            )
+
+    asyncio.create_task(_send())
+
+
 products_cache = load_products(PRODUCTS_CSV) + load_custom_products()
 promo_tasks: Dict[int, asyncio.Task] = {}
 skills_cache = load_skills()
@@ -685,8 +763,11 @@ async def cmd_start(message: Message) -> None:
         "/tracking <order_id>\n"
         "/lingua <it|en|de>\n"
         "/faq\n"
+        "/reset\n"
         "/admin - pannello admin (solo admin)"
     )
+    if message.from_user:
+        update_customer(message.from_user.id, {"stage": "qualify"})
 
 
 @dp.message(Command("help"))
@@ -806,65 +887,7 @@ async def cmd_ordine_invia(message: Message) -> None:
     if not details:
         await message.answer("Uso: /ordine_invia <dettagli ordine>")
         return
-    total = parse_total(details or "")
-    country = parse_country(details or "")
-    order_id = f"ON{int(time.time())}"
-    payload = {
-        "order_id": order_id,
-        "ts": int(time.time()),
-        "user_id": message.from_user.id if message.from_user else None,
-        "username": message.from_user.username if message.from_user else None,
-        "chat_id": message.chat.id,
-        "details": details,
-        "total": total,
-        "country": country,
-    }
-    append_jsonl(ORDERS_FILE, payload)
-    reply = t(message.from_user.id if message.from_user else None, "order_received")
-    if message.from_user:
-        record = customers_cache.get(str(message.from_user.id), {})
-        if record.get("type") == "b2b" and total:
-            discounted = total * (1 - B2B_DISCOUNT / 100.0)
-            reply += f"\nTotale B2B: EUR {discounted:.2f}"
-    await message.answer(reply)
-    if message.from_user:
-        record = customers_cache.get(str(message.from_user.id), {})
-        history = record.get("orders", [])
-        history.append({"order_id": order_id, "total": total})
-        record["orders"] = history[-10:]
-        customers_cache[str(message.from_user.id)] = record
-        save_customers(customers_cache)
-    if total:
-        suggestions = compute_upsell_suggestions(total)
-        if suggestions:
-            await message.answer(
-                "Se aggiungi un prodotto arrivi alla spedizione gratuita:\n"
-                + format_products(suggestions, limit=3)
-            )
-        method = parse_payment_method(details or "")
-        if method == "card" and STRIPE_SECRET_KEY:
-            link = create_stripe_payment_link(
-                total, STRIPE_CURRENCY, f"Oro Naturale order {order_id}"
-            )
-            if link:
-                await message.answer(
-                    "Ecco il link di pagamento con carta:\n" + link
-                )
-        if method == "crypto" and crypto_cache:
-            lines = ["Pagamento crypto disponibile:"]
-            for net, addr in crypto_cache.items():
-                lines.append(f"- {net}: {addr}")
-            await message.answer("\n".join(lines))
-    for admin_id in ADMIN_IDS:
-        await message.bot.send_message(
-            admin_id,
-            "Nuovo ordine:\n"
-            f"ID: {order_id}\n"
-            f"Utente: @{payload.get('username')}\n"
-            f"Totale: {total}\n"
-            f"Paese: {country}\n"
-            f"Dettagli: {details}",
-        )
+    process_order(details, message)
 
 
 @dp.message(Command("prezzo"))
@@ -968,6 +991,13 @@ async def cmd_faq(message: Message) -> None:
     for k in sorted(faq_cache.keys()):
         lines.append(f"- {k}")
     await message.answer("\n".join(lines))
+
+
+@dp.message(Command("reset"))
+async def cmd_reset(message: Message) -> None:
+    if message.from_user:
+        update_customer(message.from_user.id, {"stage": "idle"})
+    await message.answer("Ok, ripartiamo da zero. Dimmi cosa ti serve.")
 
 
 @dp.message(Command("tracking"))
@@ -1462,9 +1492,14 @@ async def on_text(message: Message) -> None:
         current = customers_cache.get(str(message.from_user.id), {}).get("lang")
         if not current:
             set_lang(message.from_user.id, lang_guess)
+    if message.from_user:
+        record = get_customer(message.from_user.id)
+        if record.get("stage") == "order_collect" and message.text:
+            process_order(message.text, message)
+            update_customer(message.from_user.id, {"stage": "idle"})
+            return
     if detect_b2b(message.text or "") and message.from_user:
-        customers_cache[str(message.from_user.id)] = {"type": "b2b"}
-        save_customers(customers_cache)
+        update_customer(message.from_user.id, {"type": "b2b"})
         await message.answer(
             t(message.from_user.id if message.from_user else None, "b2b_ack")
             + "\n"
@@ -1486,6 +1521,8 @@ async def on_text(message: Message) -> None:
             + "\n\n"
             + t(message.from_user.id if message.from_user else None, "payment_flow")
         )
+        if message.from_user:
+            update_customer(message.from_user.id, {"stage": "order_collect"})
         return
     if keyword == "olio":
         await cmd_olio(message)
@@ -1508,24 +1545,7 @@ async def on_text(message: Message) -> None:
     if keyword == "ordine":
         details = message.text
         if details and ":" in details:
-            payload = {
-                "ts": int(time.time()),
-                "user_id": message.from_user.id if message.from_user else None,
-                "username": message.from_user.username if message.from_user else None,
-                "chat_id": message.chat.id,
-                "details": details,
-            }
-            append_jsonl(ORDERS_FILE, payload)
-            await message.answer(
-                "Ordine ricevuto. Ti rispondo a breve con totale e pagamento."
-            )
-            for admin_id in ADMIN_IDS:
-                await message.bot.send_message(
-                    admin_id,
-                    "Nuovo ordine:\n"
-                    f"Utente: @{payload.get('username')}\n"
-                    f"Dettagli: {details}",
-                )
+            process_order(details, message)
         else:
             await message.answer(
                 t(message.from_user.id if message.from_user else None, "order_template")
@@ -1534,6 +1554,8 @@ async def on_text(message: Message) -> None:
                 + "\n\n"
                 + t(message.from_user.id if message.from_user else None, "payment_flow")
             )
+            if message.from_user:
+                update_customer(message.from_user.id, {"stage": "order_collect"})
         return
     if keyword == "prezzi":
         await message.answer(
