@@ -5,7 +5,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -56,6 +56,7 @@ DEFAULT_SHIPPING = float(os.getenv("DEFAULT_SHIPPING", "14"))
 B2B_DISCOUNT = float(os.getenv("B2B_DISCOUNT", "15"))
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "eur").strip().lower()
+FOLLOWUP_HOURS = float(os.getenv("FOLLOWUP_HOURS", "24"))
 
 PROMO_MESSAGE = (
     "Oro Naturale - EVO artigianale dall'Umbria.\n"
@@ -498,13 +499,13 @@ def set_lang(user_id: int, lang: str) -> None:
     save_customers(customers_cache)
 
 
-def get_customer(user_id: Optional[int]) -> Dict[str, str]:
+def get_customer(user_id: Optional[int]) -> Dict[str, Any]:
     if user_id is None:
         return {}
     return customers_cache.get(str(user_id), {})
 
 
-def update_customer(user_id: int, updates: Dict[str, str]) -> None:
+def update_customer(user_id: int, updates: Dict[str, Any]) -> None:
     record = customers_cache.get(str(user_id), {})
     record.update(updates)
     customers_cache[str(user_id)] = record
@@ -585,14 +586,14 @@ def current_seasonal_promo(promos: Dict[str, str]) -> str:
     return PROMO_MESSAGE
 
 
-def load_customers() -> Dict[str, Dict[str, str]]:
+def load_customers() -> Dict[str, Dict[str, Any]]:
     if not os.path.exists(CUSTOMERS_FILE):
         return {}
     with open(CUSTOMERS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_customers(customers: Dict[str, Dict[str, str]]) -> None:
+def save_customers(customers: Dict[str, Dict[str, Any]]) -> None:
     ensure_data_dir()
     with open(CUSTOMERS_FILE, "w", encoding="utf-8") as f:
         json.dump(customers, f, ensure_ascii=False, indent=2)
@@ -657,6 +658,94 @@ def create_stripe_payment_link(amount: float, currency: str, description: str) -
     return session.url
 
 
+def set_stage(user_id: int, stage: str) -> None:
+    update_customer(user_id, {"stage": stage})
+
+
+def set_chat_id(user_id: int, chat_id: int) -> None:
+    update_customer(user_id, {"chat_id": chat_id})
+
+
+def schedule_followup(user_id: int) -> None:
+    next_ts = int(time.time() + FOLLOWUP_HOURS * 3600)
+    update_customer(user_id, {"next_followup": next_ts, "followup_sent": False})
+
+
+def recommend_by_preference(pref: Optional[str], fmt: Optional[str]) -> List[Product]:
+    items = products_cache
+    if pref == "moraiolo":
+        items = [p for p in items if "moraiolo" in p.name.lower()]
+    if pref == "frantoio":
+        items = [p for p in items if "frantoio" in p.name.lower()]
+    if fmt:
+        items = [p for p in items if fmt in p.name.lower()]
+    return items[:5]
+
+
+def handle_sales_guide(message: Message) -> bool:
+    if not message.from_user:
+        return False
+    record = get_customer(message.from_user.id)
+    stage = record.get("stage", "idle")
+    if stage not in ["qualify", "lead"]:
+        return False
+    text = (message.text or "").lower()
+    usage = record.get("usage")
+    intensity = record.get("intensity")
+    fmt = record.get("format")
+
+    if not usage:
+        if any(k in text for k in ["cucina", "tavolo", "ristorante", "ristoratore"]):
+            usage = "cucina" if "cucina" in text else "tavolo"
+            update_customer(message.from_user.id, {"usage": usage})
+        else:
+            asyncio.create_task(
+                message.answer("Uso principale: cucina o servizio al tavolo?")
+            )
+            return True
+
+    if not intensity:
+        if "intenso" in text or "moraiolo" in text:
+            intensity = "moraiolo"
+            update_customer(message.from_user.id, {"intensity": intensity})
+        elif "delicato" in text or "frantoio" in text:
+            intensity = "frantoio"
+            update_customer(message.from_user.id, {"intensity": intensity})
+        else:
+            asyncio.create_task(
+                message.answer("Preferisci un profilo intenso (Moraiolo) o delicato (Frantoio)?")
+            )
+            return True
+
+    if not fmt:
+        if "5l" in text or "5 l" in text:
+            fmt = "5l"
+        elif "500" in text:
+            fmt = "500"
+        elif "250" in text:
+            fmt = "250"
+        if fmt:
+            update_customer(message.from_user.id, {"format": fmt})
+        else:
+            asyncio.create_task(
+                message.answer("Formato preferito: 250ml, 500ml o 5L?")
+            )
+            return True
+
+    suggestions = recommend_by_preference(intensity, fmt)
+    if suggestions:
+        asyncio.create_task(
+            message.answer(
+                "Ti consiglio:\n" + format_products(suggestions, limit=5)
+            )
+        )
+    asyncio.create_task(
+        message.answer("Se vuoi procedere con l'ordine, scrivi 'voglio fare un ordine'.")
+    )
+    set_stage(message.from_user.id, "order_collect")
+    return True
+
+
 def process_order(details: str, message: Message) -> None:
     total = parse_total(details or "")
     country = parse_country(details or "")
@@ -675,6 +764,7 @@ def process_order(details: str, message: Message) -> None:
 
     reply = t(message.from_user.id if message.from_user else None, "order_received")
     if message.from_user:
+        set_chat_id(message.from_user.id, message.chat.id)
         record = get_customer(message.from_user.id)
         if record.get("type") == "b2b" and total:
             discounted = total * (1 - B2B_DISCOUNT / 100.0)
@@ -684,6 +774,7 @@ def process_order(details: str, message: Message) -> None:
         record["orders"] = history[-10:]
         record["stage"] = "payment_pending"
         update_customer(message.from_user.id, record)
+        schedule_followup(message.from_user.id)
 
     async def _send() -> None:
         await message.answer(reply)
@@ -768,6 +859,7 @@ async def cmd_start(message: Message) -> None:
     )
     if message.from_user:
         update_customer(message.from_user.id, {"stage": "qualify"})
+        set_chat_id(message.from_user.id, message.chat.id)
 
 
 @dp.message(Command("help"))
@@ -843,6 +935,33 @@ async def promo_loop(bot: Bot, chat_id: int, hours: float) -> None:
         await asyncio.sleep(max(1.0, hours) * 3600)
 
 
+async def followup_loop(bot: Bot) -> None:
+    while True:
+        await asyncio.sleep(300)
+        now = int(time.time())
+        for user_id, record in list(customers_cache.items()):
+            next_ts = record.get("next_followup")
+            followup_sent = record.get("followup_sent")
+            stage = record.get("stage")
+            chat_id = record.get("chat_id")
+            if not next_ts or followup_sent or not chat_id:
+                continue
+            if stage not in ["proposal_sent", "payment_pending"]:
+                continue
+            if now >= int(next_ts):
+                try:
+                    await bot.send_message(
+                        int(chat_id),
+                        "Ti ricontatto per il tuo ordine. "
+                        "Se vuoi procedere, dimmi i dettagli o chiedimi il link di pagamento.",
+                    )
+                except Exception:
+                    pass
+                record["followup_sent"] = True
+                customers_cache[user_id] = record
+        save_customers(customers_cache)
+
+
 @dp.message(Command("promo_on"))
 async def cmd_promo_on(message: Message) -> None:
     parts = message.text.split() if message.text else []
@@ -911,6 +1030,11 @@ async def cmd_pagato(message: Message) -> None:
         "details": details,
     }
     append_jsonl(PAYMENTS_LOG_FILE, payload)
+    if message.from_user:
+        update_customer(
+            message.from_user.id,
+            {"stage": "payment_confirmed", "next_followup": None, "followup_sent": True},
+        )
     await message.answer(
         "Grazie. Ho ricevuto la conferma. Ti aggiorno appena verifichiamo."
     )
@@ -1394,6 +1518,20 @@ async def cmd_tracking_add(message: Message) -> None:
     with open(SHIPMENTS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     await message.answer("Tracking salvato.")
+    for user_id, record in customers_cache.items():
+        for o in record.get("orders", []):
+            if o.get("order_id") == order_id and record.get("chat_id"):
+                update_customer(int(user_id), {"stage": "shipped"})
+                try:
+                    await message.bot.send_message(
+                        int(record.get("chat_id")),
+                        f"Il tuo ordine {order_id} e' stato spedito.\n"
+                        f"Corriere: {carrier}\n"
+                        f"Codice: {code}\n"
+                        f"Link: {url}",
+                    )
+                except Exception:
+                    pass
 
 
 @dp.message(Command("tracking_del"))
@@ -1493,8 +1631,13 @@ async def on_text(message: Message) -> None:
         if not current:
             set_lang(message.from_user.id, lang_guess)
     if message.from_user:
+        set_chat_id(message.from_user.id, message.chat.id)
         record = get_customer(message.from_user.id)
-        if record.get("stage") == "order_collect" and message.text:
+        if (
+            record.get("stage") == "order_collect"
+            and message.text
+            and not message.text.strip().startswith("/")
+        ):
             process_order(message.text, message)
             update_customer(message.from_user.id, {"stage": "idle"})
             return
@@ -1512,6 +1655,8 @@ async def on_text(message: Message) -> None:
         record["preference"] = pref
         customers_cache[str(message.from_user.id)] = record
         save_customers(customers_cache)
+    if keyword == "" and handle_sales_guide(message):
+        return
     if keyword == "catalogo":
         await cmd_catalogo(message)
         return
@@ -1582,6 +1727,7 @@ async def on_text(message: Message) -> None:
 
 async def main() -> None:
     bot = Bot(token=TOKEN)
+    asyncio.create_task(followup_loop(bot))
     await dp.start_polling(bot)
 
 

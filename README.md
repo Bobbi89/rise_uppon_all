@@ -94,3 +94,4 @@ Il bot salva preferenze (Moraiolo/Frantoio) e storico ordini in `data/customers.
 ## Sales flow
 
 Il bot usa uno stage semplice (qualify, order_collect, payment_pending). Puoi resettare con `/reset`.
+Include follow-up automatico dopo 24h se il pagamento non e' completato.
