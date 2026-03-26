@@ -9,7 +9,15 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from dotenv import load_dotenv
 
 try:
@@ -191,10 +199,10 @@ TEXTS = {
 
 CATEGORY_LABELS = {
     "extra_virgin_olive_oil": "Olio Extravergine di Oliva",
-    "flavored_oil": "Oli Aromatizzati",
-    "wine": "Vini",
+    "flavored_oils": "Oli Aromatizzati",
+    "wines": "Vini",
     "cosmetics": "Cosmetici all'olio d'oliva",
-    "gift_box": "Confezioni Regalo",
+    "gift_boxes": "Confezioni Regalo",
     "food": "Gourmet",
 }
 
@@ -528,17 +536,94 @@ def detect_language(text: str) -> Optional[str]:
     return None
 
 
+def get_main_menu() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.row(KeyboardButton(text="🛒 Catalogo"))
+    builder.row(KeyboardButton(text="🛍️ Carrello"), KeyboardButton(text="📦 Spedizione"))
+    builder.row(KeyboardButton(text="🏢 Area B2B"), KeyboardButton(text="ℹ️ Info & FAQ"))
+    return builder.as_markup(resize_keyboard=True)
+
+
+def get_cart(user_id: int) -> Dict[str, int]:
+    record = get_customer(user_id)
+    return record.get("cart", {})
+
+
+def add_to_cart(user_id: int, product_name: str, qty: int = 1) -> None:
+    record = get_customer(user_id)
+    cart = record.get("cart", {})
+    cart[product_name] = cart.get(product_name, 0) + qty
+    record["cart"] = cart
+    update_customer(user_id, record)
+
+
+def remove_from_cart(user_id: int, product_name: str) -> None:
+    record = get_customer(user_id)
+    cart = record.get("cart", {})
+    if product_name in cart:
+        del cart[product_name]
+    record["cart"] = cart
+    update_customer(user_id, record)
+
+
+def clear_cart(user_id: int) -> None:
+    update_customer(user_id, {"cart": {}})
+
+
+def format_cart(user_id: int) -> str:
+    cart = get_cart(user_id)
+    if not cart:
+        return "Il tuo carrello è vuoto."
+    lines = ["🛒 Il tuo Carrello:"]
+    total = 0.0
+    for name, qty in cart.items():
+        price = 0.0
+        # Cerca il prezzo del prodotto
+        p_obj = next((p for p in products_cache if p.name == name), None)
+        if p_obj and p_obj.price:
+            try:
+                price = float(p_obj.price.replace(",", "."))
+            except ValueError:
+                pass
+        subtotal = price * qty
+        total += subtotal
+        lines.append(f"- {name} x{qty}: EUR {subtotal:.2f}")
+
+    lines.append(f"\nTotale: EUR {total:.2f}")
+    return "\n".join(lines)
+
+
 def parse_total(text: str) -> Optional[float]:
     m = re.search(r"(totale|total|gesamt)[^0-9]*([0-9]+([.,][0-9]+)?)", text, re.I)
     if not m:
         m = re.search(r"([0-9]+([.,][0-9]+)?)\s*(eur|€)", text, re.I)
     if not m:
         return None
-    value = m.group(2).replace(",", ".")
+    value = m.group(1).replace(",", ".") if m.group(1) else m.group(2).replace(",", ".")
     try:
         return float(value)
     except ValueError:
         return None
+
+
+def get_categories_markup() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for cat, label in CATEGORY_LABELS.items():
+        builder.row(InlineKeyboardButton(text=label, callback_data=f"cat:{cat}"))
+    return builder.as_markup()
+
+
+def get_qty_markup(product_name: str, qty: int = 1) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="-", callback_data=f"qty:set:{product_name}:{max(1, qty-1)}"),
+        InlineKeyboardButton(text=str(qty), callback_data="none"),
+        InlineKeyboardButton(text="+", callback_data=f"qty:set:{product_name}:{qty+1}"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🛒 Aggiungi al Carrello", callback_data=f"add:{product_name}:{qty}")
+    )
+    return builder.as_markup()
 
 
 def parse_country(text: str) -> Optional[str]:
@@ -747,53 +832,94 @@ def handle_sales_guide(message: Message) -> bool:
 
 
 def process_order(details: str, message: Message) -> None:
-    total = parse_total(details or "")
+    user_id = message.from_user.id if message.from_user else None
+    cart = get_cart(user_id) if user_id else {}
+    
+    # Se i dettagli non contengono prodotti, aggiungiamo quelli del carrello
+    cart_text = ""
+    cart_total = 0.0
+    if cart:
+        cart_lines = ["Prodotti nel carrello:"]
+        for name, qty in cart.items():
+            p_obj = next((p for p in products_cache if p.name == name), None)
+            price = 0.0
+            if p_obj and p_obj.price:
+                try:
+                    price = float(p_obj.price.replace(",", "."))
+                except ValueError:
+                    pass
+            subtotal = price * qty
+            cart_total += subtotal
+            cart_lines.append(f"- {name} x{qty} (EUR {subtotal:.2f})")
+        cart_text = "\n".join(cart_lines)
+
+    total = parse_total(details or "") or cart_total
     country = parse_country(details or "")
+    shipping_cost = shipping_cost_for(country or "IT", total, shipping_rules)
+    final_total = total + shipping_cost
+    
+    full_details = f"{details}\n\n{cart_text}".strip()
+    
     order_id = f"ON{int(time.time())}"
     payload = {
         "order_id": order_id,
         "ts": int(time.time()),
-        "user_id": message.from_user.id if message.from_user else None,
+        "user_id": user_id,
         "username": message.from_user.username if message.from_user else None,
         "chat_id": message.chat.id,
-        "details": details,
-        "total": total,
+        "details": full_details,
+        "total": final_total,
         "country": country,
     }
     append_jsonl(ORDERS_FILE, payload)
 
-    reply = t(message.from_user.id if message.from_user else None, "order_received")
-    if message.from_user:
-        set_chat_id(message.from_user.id, message.chat.id)
-        record = get_customer(message.from_user.id)
-        if record.get("type") == "b2b" and total:
+    # Messaggio di riepilogo finale "Poi Carrello"
+    summary = (
+        f"✅ **Ordine Ricevuto: {order_id}**\n\n"
+        f"{cart_text}\n\n"
+        f"💰 Sottotale: EUR {total:.2f}\n"
+        f"🚚 Spedizione ({country or 'IT'}): EUR {shipping_cost:.2f}\n"
+    )
+    
+    if user_id:
+        set_chat_id(user_id, message.chat.id)
+        record = get_customer(user_id)
+        if record.get("type") == "b2b":
             discounted = total * (1 - B2B_DISCOUNT / 100.0)
-            reply += f"\nTotale B2B: EUR {discounted:.2f}"
+            summary += f"🏢 Sconto B2B: -EUR {(total - discounted):.2f}\n"
+            final_total = discounted + shipping_cost
+        
+        summary += f"🔥 **TOTALE FINALE: EUR {final_total:.2f}**\n\n"
+        summary += "Ti risponderemo a breve con le istruzioni di pagamento o il link sicuro."
+        
         history = record.get("orders", [])
-        history.append({"order_id": order_id, "total": total})
+        history.append({"order_id": order_id, "total": final_total})
         record["orders"] = history[-10:]
         record["stage"] = "payment_pending"
-        update_customer(message.from_user.id, record)
-        schedule_followup(message.from_user.id)
+        update_customer(user_id, record)
+        clear_cart(user_id)
+        schedule_followup(user_id)
 
     async def _send() -> None:
-        await message.answer(reply)
-        if total:
-            suggestions = compute_upsell_suggestions(total)
-            if suggestions:
-                await message.answer(
-                    "Se aggiungi un prodotto arrivi alla spedizione gratuita:\n"
-                    + format_products(suggestions, limit=3)
-                )
+        await message.answer(summary, parse_mode="HTML")
+        if final_total:
+            # Se totale è basso, suggerisci upsell
+            if (total < FREE_SHIPPING_MIN) and (FREE_SHIPPING_MIN - total < 30):
+                suggestions = compute_upsell_suggestions(total)
+                if suggestions:
+                    await message.answer(
+                        "💡 *Suggerimento*: se aggiungi un piccolo prodotto arrivi alla **spedizione gratuita**!\n"
+                        + format_products(suggestions, limit=3)
+                    )
+            
+            # Link pagamento Stripe se disponibile
             method = parse_payment_method(details or "")
             if method == "card" and STRIPE_SECRET_KEY:
                 link = create_stripe_payment_link(
-                    total, STRIPE_CURRENCY, f"Oro Naturale order {order_id}"
+                    final_total, STRIPE_CURRENCY, f"Oro Naturale order {order_id}"
                 )
                 if link:
-                    await message.answer(
-                        "Ecco il link di pagamento con carta:\n" + link
-                    )
+                    await message.answer(f"💳 **Paga ora con carta (Stripe)**:\n{link}")
             if method == "crypto" and crypto_cache:
                 lines = ["Pagamento crypto disponibile:"]
                 for net, addr in crypto_cache.items():
@@ -832,34 +958,15 @@ dp = Dispatcher()
 async def cmd_start(message: Message) -> None:
     await message.answer(
         t(message.from_user.id if message.from_user else None, "welcome")
-        + "\n\nPer contatti aziendali usa /contatti.\n\nComandi:\n"
-        "/catalogo - tutti i prodotti\n"
-        "/olio - extravergini\n"
-        "/aromatizzati - oli aromatizzati\n"
-        "/vini - vini e spumanti\n"
-        "/cosmetici - cosmetici\n"
-        "/gift - confezioni regalo\n"
-        "/ordine - invia dati ordine\n"
-        "/ordine_invia - invia ordine\n"
-        "/spedizione <PAESE> <totale> - calcola spedizione\n"
-        "/promo - messaggio promozionale\n"
-        "/promo_on <ore> - promo automatiche nel gruppo\n"
-        "/promo_off - stop promo automatiche\n"
-        "/prezzo <nome> - cerca prezzi\n"
-        "/pagato <dettagli> - conferma pagamento\n"
-        "/contatti - info azienda\n"
-        "/pagamenti - metodi di pagamento\n"
-        "/b2b - attiva sconto professionale\n"
-        "/listino_b2b - listino professionale\n"
-        "/tracking <order_id>\n"
-        "/lingua <it|en|de>\n"
-        "/faq\n"
-        "/reset\n"
-        "/admin - pannello admin (solo admin)"
+        + "\n\nScegli un'opzione dal menu qui sotto per iniziare.",
+        reply_markup=get_main_menu(),
     )
     if message.from_user:
-        update_customer(message.from_user.id, {"stage": "qualify"})
         set_chat_id(message.from_user.id, message.chat.id)
+        # Inizializza record se nuovo
+        record = get_customer(message.from_user.id)
+        if not record:
+             update_customer(message.from_user.id, {"stage": "qualify"})
 
 
 @dp.message(Command("help"))
@@ -867,61 +974,118 @@ async def cmd_help(message: Message) -> None:
     await cmd_start(message)
 
 
+@dp.message(F.text == "🛒 Catalogo")
 @dp.message(Command("catalogo"))
 async def cmd_catalogo(message: Message) -> None:
-    text = build_catalog_message(products_cache)
-    await message.answer(text)
+    await message.answer(
+        "Esplora le nostre categorie di eccellenza umbra:",
+        reply_markup=get_categories_markup()
+    )
 
 
+@dp.callback_query(F.data.startswith("cat:"))
+async def process_category(callback: CallbackQuery) -> None:
+    category = callback.data.split(":")[1]
+    filtered = [p for p in products_cache if p.category == category]
+    label = CATEGORY_LABELS.get(category, category)
+    
+    if not filtered:
+        await callback.answer("Nessun prodotto in questa categoria.")
+        return
+
+    await callback.message.answer(f"--- {label} ---")
+    for p in filtered[:10]:
+        price = f"EUR {p.price}" if p.price else "Prezzo su richiesta"
+        await callback.message.answer(
+            f"<b>{p.name}</b>\n{p.description[:100]}...\n💰 {price}",
+            reply_markup=get_qty_markup(p.name, 1),
+            parse_mode="HTML"
+        )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("qty:set:"))
+async def process_qty_set(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    if len(parts) < 4:
+        return
+    product_name = parts[2]
+    new_qty = int(parts[3])
+    
+    await callback.message.edit_reply_markup(
+        reply_markup=get_qty_markup(product_name, new_qty)
+    )
+    await callback.answer()
+
+
+@dp.message(F.text == "Olio" )
 @dp.message(Command("olio"))
 async def cmd_olio(message: Message) -> None:
     oils = [p for p in products_cache if p.category == "extra_virgin_olive_oil"]
-    if message.from_user:
-        record = customers_cache.get(str(message.from_user.id), {})
-        if record.get("type") == "b2b":
-            lines = []
-            for p in oils:
-                try:
-                    price = float(p.price.replace(",", "."))
-                    disc = price * (1 - B2B_DISCOUNT / 100.0)
-                    lines.append(f"- {p.name} - EUR {disc:.2f} (B2B)")
-                except Exception:
-                    lines.append(f"- {p.name} - EUR {p.price}")
-            await message.answer("Listino B2B oli:\n" + "\n".join(lines))
-            return
-    await message.answer(
-        "Oli extravergine disponibili:\n" + format_products(oils, limit=12)
-    )
+    if not oils:
+        await message.answer("Nessun olio disponibile.")
+        return
+    
+    await message.answer("--- 🍯 Oli Extravergine di Oliva ---")
+    for p in oils[:10]:
+        price = f"EUR {p.price}" if p.price else "Prezzo su richiesta"
+        await message.answer(
+            f"<b>{p.name}</b>\n💰 {price}",
+            reply_markup=get_qty_markup(p.name, 1),
+            parse_mode="HTML"
+        )
 
 
 @dp.message(Command("aromatizzati"))
 async def cmd_aromatizzati(message: Message) -> None:
-    oils = [p for p in products_cache if p.category == "flavored_oil"]
-    await message.answer(
-        "Oli aromatizzati disponibili:\n" + format_products(oils, limit=12)
-    )
+    items = [p for p in products_cache if p.category == "flavored_oils"]
+    await message.answer("--- 🍋 Oli Aromatizzati ---")
+    for p in items[:10]:
+        price = f"EUR {p.price}" if p.price else "Prezzo su richiesta"
+        await message.answer(
+            f"<b>{p.name}</b>\n💰 {price}",
+            reply_markup=get_qty_markup(p.name, 1),
+            parse_mode="HTML"
+        )
 
 
 @dp.message(Command("vini"))
 async def cmd_vini(message: Message) -> None:
-    wines = [p for p in products_cache if p.category == "wine"]
-    await message.answer("Vini disponibili:\n" + format_products(wines, limit=12))
+    items = [p for p in products_cache if p.category == "wines"]
+    await message.answer("--- 🍷 Vini & Bollicine ---")
+    for p in items[:10]:
+        price = f"EUR {p.price}" if p.price else "Prezzo su richiesta"
+        await message.answer(
+            f"<b>{p.name}</b>\n💰 {price}",
+            reply_markup=get_qty_markup(p.name, 1),
+            parse_mode="HTML"
+        )
 
 
 @dp.message(Command("cosmetici"))
 async def cmd_cosmetici(message: Message) -> None:
     items = [p for p in products_cache if p.category == "cosmetics"]
-    await message.answer(
-        "Cosmetici disponibili:\n" + format_products(items, limit=12)
-    )
+    await message.answer("--- 🧴 Cosetica all'Olio ---")
+    for p in items[:10]:
+        price = f"EUR {p.price}" if p.price else "Prezzo su richiesta"
+        await message.answer(
+            f"<b>{p.name}</b>\n💰 {price}",
+            reply_markup=get_qty_markup(p.name, 1),
+            parse_mode="HTML"
+        )
 
 
 @dp.message(Command("gift"))
 async def cmd_gift(message: Message) -> None:
-    items = [p for p in products_cache if p.category == "gift_box"]
-    await message.answer(
-        "Confezioni regalo:\n" + format_products(items, limit=12)
-    )
+    items = [p for p in products_cache if p.category == "gift_boxes"]
+    await message.answer("--- 🎁 Confezioni Regalo ---")
+    for p in items[:10]:
+        price = f"EUR {p.price}" if p.price else "Prezzo su richiesta"
+        await message.answer(
+            f"<b>{p.name}</b>\n💰 {price}",
+            reply_markup=get_qty_markup(p.name, 1),
+            parse_mode="HTML"
+        )
 
 
 @dp.message(Command("promo"))
@@ -1109,11 +1273,119 @@ async def cmd_lingua(message: Message) -> None:
     await message.answer(t(message.from_user.id if message.from_user else None, "ask_lang"))
 
 
+@dp.callback_query(F.data.startswith("add:"))
+async def process_add_to_cart(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    if len(parts) < 3:
+        return
+    product_name = parts[1]
+    qty = int(parts[2])
+    
+    if callback.from_user:
+        add_to_cart(callback.from_user.id, product_name, qty)
+        await callback.answer(f"Aggiunto: {product_name} x{qty}")
+    else:
+        await callback.answer("Errore: utente non trovato.")
+
+
+@dp.message(F.text == "🛍️ Carrello")
+@dp.message(Command("carrello"))
+async def cmd_view_cart(message: Message) -> None:
+    user_id = message.from_user.id if message.from_user else None
+    if not user_id:
+        return
+    
+    cart = get_cart(user_id)
+    if not cart:
+        await message.answer("Il tuo carrello è vuoto. Esplora il /catalogo!")
+        return
+    
+    text = format_cart(user_id)
+    builder = InlineKeyboardBuilder()
+    for name in cart.keys():
+        builder.row(InlineKeyboardButton(text=f"❌ Rimuovi {name}", callback_data=f"rem:{name}"))
+    
+    builder.row(InlineKeyboardButton(text="🚛 INSERISCI DATI SPEDIZIONE", callback_data="checkout_data"))
+    builder.row(InlineKeyboardButton(text="🗑️ Svuota Carrello", callback_data="cart_clear"))
+    
+    await message.answer(text, reply_markup=builder.as_markup())
+
+
+@dp.callback_query(F.data.startswith("rem:"))
+async def process_remove_from_cart(callback: CallbackQuery) -> None:
+    product_name = callback.data.split(":")[1]
+    if callback.from_user:
+        remove_from_cart(callback.from_user.id, product_name)
+        await callback.answer(f"Rimosso: {product_name}")
+        await cmd_view_cart(callback.message)
+    else:
+        await callback.answer()
+
+
+@dp.callback_query(F.data == "cart_clear")
+async def process_clear_cart(callback: CallbackQuery) -> None:
+    if callback.from_user:
+        clear_cart(callback.from_user.id)
+        await callback.answer("Carrello svuotato.")
+        await callback.message.edit_text("Carrello svuotato. Esplora il /catalogo!")
+
+
+@dp.callback_query(F.data == "checkout_data")
+async def process_checkout_data(callback: CallbackQuery) -> None:
+    if not callback.from_user:
+        return
+    
+    cart = get_cart(callback.from_user.id)
+    if not cart:
+        await callback.answer("Carrello vuoto.")
+        return
+    
+    set_stage(callback.from_user.id, "order_collect")
+    await callback.message.answer(
+        "📝 **Dati per la spedizione**\n\n"
+        "Per calcolare le spese e preparare l'ordine, inviami per favore:\n"
+        "- Nome e Cognome\n"
+        "- Indirizzo (Via, Civico, CAP, Città, **Paese**)\n"
+        "- Email\n\n"
+        "Scrivi tutto in un unico messaggio."
+    )
+    await callback.answer()
+
+
+@dp.message(F.text == "📦 Spedizione")
+@dp.message(Command("spedizione_info"))
+async def cmd_shipping_info(message: Message) -> None:
+    await message.answer(
+        "🚢 **Info Spedizioni**\n\n"
+        f"• Italia: EUR {DEFAULT_SHIPPING}\n"
+        f"• Europa: Tariffe variabili\n"
+        f"• **GRATIS** per ordini superiori a EUR {FREE_SHIPPING_MIN}\n\n"
+        "Il costo esatto verrà calcolato durante il checkout."
+    )
+
+
+@dp.message(F.text == "🏢 Area B2B")
+@dp.message(Command("b2b_info"))
+async def cmd_b2b_info(message: Message) -> None:
+    await message.answer(
+        "🏢 **Area Business (B2B)**\n\n"
+        "Sei un ristoratore o un'azienda? Offriamo:\n"
+        f"• Sconto del {B2B_DISCOUNT}% su tutto il listino\n"
+        "• Formati speciali da 5L e 10L\n"
+        "• Fatturazione elettronica\n\n"
+        "Usa /b2b per attivare subito lo sconto professionale."
+    )
+
+
+@dp.message(F.text == "ℹ️ Info & FAQ")
 @dp.message(Command("faq"))
-async def cmd_faq(message: Message) -> None:
-    lines = [t(message.from_user.id if message.from_user else None, "faq_title")]
+@dp.message(Command("faq_menu"))
+async def cmd_info_faq(message: Message) -> None:
+    lines = ["ℹ️ **Informazioni & FAQ**\n"]
+    lines.append("Hai domande? Usa una parola chiave oppure consulta le FAQ qui sotto:\n")
     for k in sorted(faq_cache.keys()):
         lines.append(f"- {k}")
+    
     await message.answer("\n".join(lines))
 
 
