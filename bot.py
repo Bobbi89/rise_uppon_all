@@ -956,17 +956,24 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message) -> None:
+    user_id = message.from_user.id if message.from_user else None
+    welcome_text = t(user_id, "welcome")
+    
+    # Se l'admin non è impostato, mostriamo l'ID all'utente per aiutarlo nella configurazione
+    if not ADMIN_IDS and user_id:
+        welcome_text += f"\n\n⚙️ **Configurazione Admin**:\nIl tuo ID Telegram è: <code>{user_id}</code>\nCopia questo ID nel file <code>.env</code> alla voce <code>ADMIN_CHAT_ID</code> per ricevere gli ordini."
+
     await message.answer(
-        t(message.from_user.id if message.from_user else None, "welcome")
-        + "\n\nScegli un'opzione dal menu qui sotto per iniziare.",
+        welcome_text + "\n\nScegli un'opzione dal menu qui sotto per iniziare.",
         reply_markup=get_main_menu(),
+        parse_mode="HTML"
     )
-    if message.from_user:
-        set_chat_id(message.from_user.id, message.chat.id)
+    if user_id:
+        set_chat_id(user_id, message.chat.id)
         # Inizializza record se nuovo
-        record = get_customer(message.from_user.id)
+        record = get_customer(user_id)
         if not record:
-             update_customer(message.from_user.id, {"stage": "qualify"})
+             update_customer(user_id, {"stage": "qualify"})
 
 
 @dp.message(Command("help"))
