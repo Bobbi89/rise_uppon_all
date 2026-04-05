@@ -16,7 +16,7 @@ pip install -r requirements.txt
 3. Avvia il bot:
 
 ```bash
-python bot.py
+python main.py
 ```
 
 ## Comandi
@@ -95,3 +95,14 @@ Il bot salva preferenze (Moraiolo/Frantoio) e storico ordini in `data/customers.
 
 Il bot usa uno stage semplice (qualify, order_collect, payment_pending). Puoi resettare con `/reset`.
 Include follow-up automatico dopo 24h se il pagamento non e' completato.
+
+## Nuova architettura
+
+La versione attiva ora è modulare:
+- `main.py` entrypoint
+- `oro_naturale/config.py` configurazione
+- `oro_naturale/storage.py` persistenza file-based
+- `oro_naturale/keyboards.py` pulsanti e menu
+- `oro_naturale/services.py` ordini, Stripe, follow-up
+- `oro_naturale/routers/public.py` flusso clienti
+- `oro_naturale/routers/admin.py` pannello privato
