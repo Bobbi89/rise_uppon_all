@@ -7,11 +7,11 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from ..catalog import format_products, load_products_from_csv
+from ..catalog import format_products
 from ..context import BotContext
 from ..models import Product
 from ..services import format_company, format_payments, is_admin_user
-from ..storage import save_products_json
+from ..storage import load_products_from_csv, save_products_json
 
 
 def build_admin_router(ctx: BotContext) -> Router:
@@ -331,7 +331,7 @@ def build_admin_router(ctx: BotContext) -> Router:
         if not admin_only(message):
             await message.answer("Comando riservato agli admin.")
             return
-        ctx.reload_products(load_products_from_csv(ctx.settings.products_csv))
+        ctx.reload_products(load_products_from_csv(ctx.settings.products_csv) + ctx.custom_products)
         await message.answer("Catalogo ricaricato.")
 
     return router
