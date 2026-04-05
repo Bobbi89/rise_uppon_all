@@ -28,6 +28,7 @@ python main.py
 - `/cosmetici` cosmetici
 - `/gift` confezioni regalo
 - `/ordine` richiede i dati per ordine
+- `/carrello` mostra il carrello
 - `/promo` messaggio promozionale
 - `/promo_on <ore>` promo automatiche nella chat
 - `/promo_off` stop promo automatiche
@@ -59,6 +60,18 @@ Comandi admin:
 - `/reload` ricarica catalogo
  - `/azienda_set <campo>|<valore>` aggiorna contatti azienda
  - `/pagamento_add <metodo>` aggiorna metodi pagamento
+
+## Menu iniziale
+
+Il menu pubblico offre scorciatoie per:
+- Catalogo
+- Carrello
+- Fai un ordine
+- Pagamenti
+- Spedizione
+- Contatti
+- Area B2B
+- Info & FAQ
 
 ## B2B
 

@@ -99,10 +99,16 @@ def build_public_router(ctx: BotContext) -> Router:
                 record["stage"] = "qualify"
             save_customer(user_id, record)
         await message.answer(
-            "Ciao, sono Oro Naturale.\n"
-            "Ti aiuto a scegliere oli EVO, vini, cosmetici e confezioni regalo.\n"
-            "Usa il menu qui sotto per iniziare.",
+            "<b>Oro Naturale</b>\n"
+            "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.\n\n"
+            "<b>Scorciatoie rapide</b>\n"
+            "• catalogo e carrello\n"
+            "• ordine e checkout Stripe\n"
+            "• spedizione e tracking\n"
+            "• area B2B per ristoratori\n\n"
+            "Puoi anche scrivere direttamente <i>voglio fare un ordine</i>.",
             reply_markup=main_menu(),
+            parse_mode="HTML",
         )
 
     @router.message(Command("help"))
@@ -213,9 +219,17 @@ def build_public_router(ctx: BotContext) -> Router:
     async def contacts(message: Message) -> None:
         await message.answer(format_company(ctx.company))
 
+    @router.message(F.text == "📞 Contatti")
+    async def contacts_button(message: Message) -> None:
+        await contacts(message)
+
     @router.message(Command("pagamenti"))
     async def payments(message: Message) -> None:
         await message.answer(format_payments(ctx.payment_methods, ctx.settings))
+
+    @router.message(F.text == "💳 Pagamenti")
+    async def payments_button(message: Message) -> None:
+        await payments(message)
 
     @router.message(Command("spedizione"))
     async def shipping_info(message: Message) -> None:
@@ -236,6 +250,10 @@ def build_public_router(ctx: BotContext) -> Router:
         await message.answer(
             f"Attivato profilo professionale con sconto del {ctx.settings.b2b_discount}%."
         )
+
+    @router.message(F.text == "🏢 Area B2B")
+    async def b2b_button(message: Message) -> None:
+        await b2b(message)
 
     @router.message(Command("lingua"))
     async def language(message: Message) -> None:
@@ -260,6 +278,10 @@ def build_public_router(ctx: BotContext) -> Router:
             return
         await message.answer("FAQ:\n" + "\n".join(f"- {k}" for k in sorted(ctx.faq.keys())))
 
+    @router.message(F.text == "ℹ️ Info & FAQ")
+    async def faq_button(message: Message) -> None:
+        await faq(message)
+
     @router.message(Command("tracking"))
     async def tracking(message: Message) -> None:
         parts = (message.text or "").split(maxsplit=1)
@@ -279,6 +301,10 @@ def build_public_router(ctx: BotContext) -> Router:
             f"Link: {entry.get('url')}"
         )
 
+    @router.message(F.text == "📦 Spedizione")
+    async def shipping_button(message: Message) -> None:
+        await shipping_info(message)
+
     @router.message(Command("reset"))
     async def reset(message: Message) -> None:
         if message.from_user:
@@ -296,6 +322,10 @@ def build_public_router(ctx: BotContext) -> Router:
         await message.answer(
             "Perfetto. Inviami i dati del cliente e ti preparo totale, spedizione e Stripe."
         )
+
+    @router.message(F.text == "📝 Fai un ordine")
+    async def order_button(message: Message) -> None:
+        await order_entry(message)
 
     @router.message(F.text)
     async def text_router(message: Message) -> None:
@@ -398,7 +428,8 @@ def build_public_router(ctx: BotContext) -> Router:
 
         await message.answer(
             "Posso aiutarti con catalogo, carrello, spedizione, ordini e pagamenti Stripe.\n"
-            "Usa il menu qui sotto o scrivi 'voglio fare un ordine'."
+            "Usa il menu qui sotto oppure scrivi <i>voglio fare un ordine</i>.",
+            parse_mode="HTML",
         )
         save_customer(message.from_user.id, record)
 

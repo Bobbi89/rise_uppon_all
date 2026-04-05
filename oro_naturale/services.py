@@ -126,11 +126,19 @@ def format_company(company: dict[str, Any]) -> str:
     if not company:
         return "Contatti non disponibili. Scrivi all'admin."
     lines = []
+    labels = {
+        "name": "Ragione sociale",
+        "website": "Sito",
+        "email": "Email",
+        "phone": "Telefono",
+        "vat": "P.IVA",
+        "hours": "Orari",
+        "address": "Indirizzo",
+    }
     for key in ["name", "website", "email", "phone", "vat", "hours", "address"]:
         value = company.get(key)
         if value:
-            label = "P.IVA" if key == "vat" else key.title()
-            lines.append(f"{label}: {value}")
+            lines.append(f"{labels.get(key, key.title())}: {value}")
     return "\n".join(lines)
 
 

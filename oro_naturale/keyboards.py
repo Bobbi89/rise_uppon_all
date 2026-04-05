@@ -11,10 +11,17 @@ def main_menu() -> ReplyKeyboardMarkup:
         KeyboardButton(text="🛍️ Carrello"),
     )
     builder.row(
-        KeyboardButton(text="📦 Spedizione"),
-        KeyboardButton(text="🏢 Area B2B"),
+        KeyboardButton(text="📝 Fai un ordine"),
+        KeyboardButton(text="💳 Pagamenti"),
     )
-    builder.row(KeyboardButton(text="ℹ️ Info & FAQ"))
+    builder.row(
+        KeyboardButton(text="📦 Spedizione"),
+        KeyboardButton(text="📞 Contatti"),
+    )
+    builder.row(
+        KeyboardButton(text="🏢 Area B2B"),
+        KeyboardButton(text="ℹ️ Info & FAQ"),
+    )
     return builder.as_markup(resize_keyboard=True, is_persistent=True)
 
 
