@@ -1,10 +1,48 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 from dataclasses import asdict
+from pathlib import Path
 from typing import Iterable
 
 from .models import Product
+
+
+def load_products_from_csv(file_path: str) -> list[Product]:
+    """Load products from a CSV file and return a list of Product instances.
+
+    Returns an empty list if the file does not exist or contains no data rows.
+    Only the columns that map to Product fields are used; all other columns are
+    silently ignored so the function stays forward-compatible with extra CSV
+    columns (image_url, details, translations, etc.).
+    """
+    path = Path(file_path)
+    if not path.exists():
+        return []
+
+    products: list[Product] = []
+    try:
+        with path.open(newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                name = (row.get("name") or "").strip()
+                if not name:
+                    continue
+                products.append(
+                    Product(
+                        name=name,
+                        description=(row.get("description") or "").strip(),
+                        price=(row.get("price") or "").strip(),
+                        category=(row.get("category") or "").strip(),
+                        featured=(row.get("featured") or "false").strip(),
+                        stock=(row.get("stock") or "").strip(),
+                    )
+                )
+    except Exception:
+        return []
+
+    return products
 
 
 CATEGORY_LABELS = {
