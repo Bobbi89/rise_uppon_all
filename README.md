@@ -46,6 +46,43 @@ Il bot legge i prodotti da `Product_export.csv`.
    - `PRODUCTS_CSV` (opzionale, default `Product_export.csv`)
 3. Deploy. Railway avvia automaticamente il comando definito in `nixpacks.toml`.
 
+## Uso dal mobile
+
+Se vuoi lavorare da telefono, la strada piu semplice e' usare **Termux** su Android oppure **GitHub Mobile + Railway web**.
+
+### Pacchetti utili su Termux
+
+Installa questi strumenti:
+- `git`
+- `python`
+- `nodejs`
+- `npm`
+
+Poi installa la CLI di Railway:
+
+```bash
+npm install -g @railway/cli
+```
+
+### Setup rapido su Termux
+
+```bash
+pkg update
+pkg install git python nodejs
+pip install -r requirements.txt
+npm install -g @railway/cli
+```
+
+### Flusso consigliato dal telefono
+
+1. Fai le modifiche al codice.
+2. Esegui `git add`, `git commit` e `git push`.
+3. Apri Railway dal browser mobile e lascia fare il redeploy automatico.
+
+Se preferisci, puoi anche evitare la CLI e usare solo:
+- GitHub app per il push
+- Railway dashboard mobile per il deploy
+
 ## Admin e gestione
 
 Imposta `ADMIN_CHAT_ID` (anche multipli separati da virgola) per vedere ordini e pagamenti.
