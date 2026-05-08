@@ -135,10 +135,20 @@ def build_public_router(ctx: BotContext) -> Router:
         await callback.message.answer(f"--- {category_label(category_name)} ---")
         for product in products[:10]:
             key = product_key(product)
-            await callback.message.answer(
-                format_product(product),
-                reply_markup=quantity_menu(key, 1),
-            )
+            caption = format_product(product)
+            if product.image_url:
+                await callback.message.answer_photo(
+                    photo=product.image_url,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=quantity_menu(key, 1),
+                )
+            else:
+                await callback.message.answer(
+                    caption,
+                    reply_markup=quantity_menu(key, 1),
+                    parse_mode="HTML",
+                )
         await callback.answer()
 
     @router.callback_query(F.data.startswith("qty:"))

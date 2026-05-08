@@ -47,6 +47,10 @@ class FileStore:
         return rows[-limit:]
 
 
+def normalize_description(value: str) -> str:
+    return " ".join(value.split())
+
+
 def load_products_from_csv(path: str) -> list[Product]:
     items: list[Product] = []
     if not os.path.exists(path):
@@ -57,9 +61,10 @@ def load_products_from_csv(path: str) -> list[Product]:
             items.append(
                 Product(
                     name=row.get("name", "").strip(),
-                    description=row.get("description", "").strip(),
+                    description=normalize_description(row.get("description", "").strip()),
                     price=row.get("price", "").strip(),
                     category=row.get("category", "").strip(),
+                    image_url=row.get("image_url", "").strip(),
                     featured=row.get("featured", "").strip() or "false",
                     stock=row.get("stock", "").strip(),
                 )
@@ -77,9 +82,10 @@ def load_products_json(path: Path) -> list[Product]:
         products.append(
             Product(
                 name=str(row.get("name", "")).strip(),
-                description=str(row.get("description", "")).strip(),
+                description=normalize_description(str(row.get("description", "")).strip()),
                 price=str(row.get("price", "")).strip(),
                 category=str(row.get("category", "")).strip(),
+                image_url=str(row.get("image_url", "")).strip(),
                 featured=str(row.get("featured", "false")).strip() or "false",
                 stock=str(row.get("stock", "")).strip(),
             )
@@ -94,6 +100,7 @@ def save_products_json(path: Path, products: list[Product]) -> None:
             "description": p.description,
             "price": p.price,
             "category": p.category,
+            "image_url": p.image_url,
             "featured": p.featured,
             "stock": p.stock,
         }

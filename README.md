@@ -55,7 +55,7 @@ Comandi admin:
 - `/orders` ultimi ordini
 - `/payments` ultimi pagamenti
 - `/shipping_set <PAESE> <costo>` regole spedizione
-- `/product_add <nome>|<prezzo>|<categoria>|<descrizione>` aggiungi prodotto custom
+- `/product_add <nome>|<prezzo>|<categoria>|<descrizione>|[image_url]` aggiungi prodotto custom (foto opzionale)
 - `/skill_add <keyword>|<risposta>` aggiungi risposta rapida
 - `/reload` ricarica catalogo
  - `/azienda_set <campo>|<valore>` aggiorna contatti azienda

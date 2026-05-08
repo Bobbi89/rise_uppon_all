@@ -31,7 +31,7 @@ def build_admin_router(ctx: BotContext) -> Router:
             "- /payments ultimi pagamenti\n"
             "- /shipping_set <PAESE> <costo>\n"
             "- /shipping_list\n"
-            "- /product_add <nome>|<prezzo>|<categoria>|<descrizione>\n"
+            "- /product_add <nome>|<prezzo>|<categoria>|<descrizione>|[image_url]\n"
             "- /product_del <nome>\n"
             "- /company_set <campo>|<valore>\n"
             "- /company_view\n"
@@ -167,12 +167,19 @@ def build_admin_router(ctx: BotContext) -> Router:
             await message.answer("Comando riservato agli admin.")
             return
         raw = (message.text or "").replace("/product_add", "").strip()
-        parts = [p.strip() for p in raw.split("|", 3)]
+        parts = [p.strip() for p in raw.split("|", 4)]
         if len(parts) < 4:
-            await message.answer("Uso: /product_add <nome>|<prezzo>|<categoria>|<descrizione>")
+            await message.answer("Uso: /product_add <nome>|<prezzo>|<categoria>|<descrizione>|[image_url]")
             return
+        image_url = parts[4] if len(parts) > 4 else ""
         ctx.custom_products.append(
-            Product(name=parts[0], price=parts[1], category=parts[2], description=parts[3])
+            Product(
+                name=parts[0],
+                price=parts[1],
+                category=parts[2],
+                description=parts[3],
+                image_url=image_url,
+            )
         )
         save_products_json(ctx.store.json_path("custom_products.json"), ctx.custom_products)
         ctx.reload_products(load_products_from_csv(ctx.settings.products_csv) + ctx.custom_products)

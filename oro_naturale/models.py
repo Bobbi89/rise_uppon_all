@@ -9,5 +9,6 @@ class Product:
     description: str
     price: str
     category: str
+    image_url: str = ""
     featured: str = "false"
     stock: str = ""
