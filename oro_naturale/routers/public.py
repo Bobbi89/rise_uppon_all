@@ -31,6 +31,7 @@ from ..services import (
     is_admin_user,
     parse_total,
     process_order_payload,
+    natural_business_reply,
     recommend_upsell,
 )
 
@@ -433,6 +434,18 @@ def build_public_router(ctx: BotContext) -> Router:
         recommendations = recommendations_for(ctx.products, record.get("preference"), record.get("format"))
         if recommendations and ("olio" in (message.text or "").lower() or "catalogo" in (message.text or "").lower()):
             await message.answer("Ti consiglio:\n" + format_products(recommendations))
+            save_customer(message.from_user.id, record)
+            return
+
+        natural_reply = natural_business_reply(
+            text=message.text or "",
+            products=ctx.products,
+            settings=ctx.settings,
+            shipping_rules=ctx.shipping_rules,
+            company=ctx.company,
+        )
+        if natural_reply:
+            await message.answer(natural_reply)
             save_customer(message.from_user.id, record)
             return
 

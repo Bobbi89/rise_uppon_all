@@ -170,6 +170,83 @@ def recommend_upsell(products: list[Product], subtotal: float, settings: Setting
     return picks
 
 
+def _top_products_by_query(products: list[Product], query: str, limit: int = 3) -> list[Product]:
+    text = query.lower()
+    matches = [
+        p
+        for p in products
+        if text in p.name.lower() or text in p.description.lower() or text in p.category.lower()
+    ]
+    return matches[:limit]
+
+
+def natural_business_reply(
+    *,
+    text: str,
+    products: list[Product],
+    settings: Settings,
+    shipping_rules: dict[str, float],
+    company: dict[str, Any],
+) -> str | None:
+    t = text.lower().strip()
+    if not t:
+        return None
+
+    if any(k in t for k in ["spedizione", "shipping", "consegna", "delivery"]):
+        countries = ", ".join(sorted(shipping_rules.keys())) if shipping_rules else "IT (default)"
+        return (
+            f"Certo 👍 Spediamo in Italia e all'estero.\n"
+            f"- Spedizione gratuita da EUR {settings.free_shipping_min:.2f}\n"
+            f"- Tariffa standard: EUR {settings.default_shipping:.2f}\n"
+            f"- Paesi con tariffa dedicata: {countries}\n"
+            "Se mi scrivi paese + totale ordine, ti calcolo subito il costo preciso."
+        )
+
+    if any(k in t for k in ["prezzo", "prezzi", "costo", "quanto costa", "price"]):
+        priced = [p for p in products if product_price_value(p) is not None]
+        priced.sort(key=lambda p: product_price_value(p) or 0.0)
+        preview = "\n".join(
+            f"- {p.name}: EUR {product_price_value(p):.2f}" for p in priced[:3]
+        )
+        if not preview:
+            return "Ti preparo volentieri un preventivo: al momento non vedo prezzi configurati nel catalogo."
+        return "Certo! Ecco alcuni prezzi dal catalogo:\n" + preview + "\n\nScrivimi il prodotto che ti interessa e ti rispondo subito."
+
+    if any(k in t for k in ["azienda", "business", "chi siete", "about", "contatti", "contact"]):
+        company_name = company.get("name", "Oro Naturale")
+        website = company.get("website", "non disponibile")
+        email = company.get("email", "non disponibile")
+        phone = company.get("phone", "non disponibile")
+        return (
+            f"{company_name} 🌿\n"
+            f"Sito: {website}\n"
+            f"Email: {email}\n"
+            f"Telefono: {phone}\n"
+            "Se vuoi, posso anche aiutarti a scegliere i prodotti migliori per uso quotidiano, regalo o ristorazione."
+        )
+
+    for keyword in ["olio", "evo", "vino", "cosmet", "gift", "regalo"]:
+        if keyword in t:
+            hits = _top_products_by_query(products, keyword, limit=3)
+            if hits:
+                lines = []
+                for p in hits:
+                    price = product_price_value(p)
+                    price_text = f"EUR {price:.2f}" if price is not None else "Prezzo su richiesta"
+                    lines.append(f"- {p.name} ({price_text})")
+                return "Ottima scelta 🙌 Ti consiglio:\n" + "\n".join(lines)
+            return "Abbiamo diverse opzioni nel catalogo. Scrivimi il formato o la fascia prezzo e ti propongo le migliori."
+
+    if any(k in t for k in ["b2b", "ristorante", "partita iva", "fornitura", "ingrosso"]):
+        return (
+            f"Sì, gestiamo anche forniture B2B ✅\n"
+            f"Per ristoratori/appalti applichiamo uno sconto indicativo del {settings.b2b_discount:.0f}%.\n"
+            "Se vuoi, ti preparo una proposta con quantità e tempi di consegna."
+        )
+
+    return None
+
+
 def process_order_payload(
     *,
     message: Message,
