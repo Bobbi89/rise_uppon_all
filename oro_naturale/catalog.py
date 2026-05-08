@@ -39,7 +39,8 @@ def product_price_value(product: Product) -> float | None:
 
 def format_product(product: Product) -> str:
     price = f"EUR {product.price}" if product.price else "Prezzo su richiesta"
-    return f"<b>{product.name}</b>\n{product.description}\n💰 {price}"
+    description = product.description or "Descrizione non disponibile."
+    return f"<b>{product.name}</b>\n{description}\n💰 {price}"
 
 
 def format_products(items: Iterable[Product], limit: int = 12) -> str:
