@@ -18,7 +18,6 @@ class BotContext:
     custom_products: list[Product] = field(default_factory=list)
     customers: dict[str, Any] = field(default_factory=dict)
     faq: dict[str, str] = field(default_factory=dict)
-    crypto: dict[str, str] = field(default_factory=dict)
     seasonal_promos: dict[str, str] = field(default_factory=dict)
     shipping_rules: dict[str, float] = field(default_factory=dict)
 
@@ -31,7 +30,6 @@ class BotContext:
         self.custom_products = load_products_json(self.store.json_path("custom_products.json"))
         self.customers = self.store.load_json("customers.json", {})
         self.faq = self.store.load_json("faq.json", {})
-        self.crypto = self.store.load_json("crypto_addresses.json", {})
         self.seasonal_promos = self.store.load_json("seasonal_promos.json", {})
         self.shipping_rules = self.store.load_json("shipping.json", {})
 
@@ -49,9 +47,6 @@ class BotContext:
 
     def save_faq(self) -> None:
         self.store.save_json("faq.json", self.faq)
-
-    def save_crypto(self) -> None:
-        self.store.save_json("crypto_addresses.json", self.crypto)
 
     def save_seasonal_promos(self) -> None:
         self.store.save_json("seasonal_promos.json", self.seasonal_promos)
