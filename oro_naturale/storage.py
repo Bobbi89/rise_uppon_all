@@ -1,3 +1,4 @@
+# storage.py
 from __future__ import annotations
 
 import csv
@@ -52,7 +53,6 @@ def normalize_description(value: str) -> str:
 
 
 def _parse_details(raw_details: Any) -> dict[str, Any]:
-    """Converte i dettagli extra del prodotto (es. origine, formato) in dict."""
     if not raw_details:
         return {}
     if isinstance(raw_details, dict):
@@ -65,6 +65,14 @@ def _parse_details(raw_details: Any) -> dict[str, Any]:
     return {}
 
 
+def _get_col(row: dict, name: str, default: str = "") -> str:
+    """Helper per leggere le colonne del CSV ignorando maiuscole/minuscole."""
+    for k, v in row.items():
+        if k and k.lower() == name.lower():
+            return v
+    return default
+
+
 def load_products_from_csv(path: str) -> list[Product]:
     items: list[Product] = []
     if not os.path.exists(path):
@@ -75,14 +83,15 @@ def load_products_from_csv(path: str) -> list[Product]:
         for row in reader:
             items.append(
                 Product(
-                    name=row.get("name", "").strip(),
-                    description=normalize_description(row.get("description", "").strip()),
-                    price=row.get("price", "0").strip(),
-                    category=row.get("category", "").strip(),
-                    image_url=row.get("image_url", "").strip(),
-                    featured=row.get("featured", "false").strip() or "false",
-                    stock=row.get("stock", "0").strip(),
-                    details=_parse_details(row.get("details", "")),
+                    id=_get_col(row, "id", "").strip(),
+                    name=_get_col(row, "name", "").strip(),
+                    description=normalize_description(_get_col(row, "description", "").strip()),
+                    price=_get_col(row, "price", "0").strip(),
+                    category=_get_col(row, "category", "").strip(),
+                    image_url=_get_col(row, "image_url", "").strip(),
+                    featured=_get_col(row, "featured", "false").strip() or "false",
+                    stock=_get_col(row, "stock", "0").strip(),
+                    details=_parse_details(_get_col(row, "details", "")),
                 )
             )
     return items
@@ -91,14 +100,13 @@ def load_products_from_csv(path: str) -> list[Product]:
 def load_products_json(path: Path) -> list[Product]:
     if not path.exists():
         return []
-    
     with path.open("r", encoding="utf-8") as f:
         raw = json.load(f)
-        
     products: list[Product] = []
     for row in raw:
         products.append(
             Product(
+                id=str(row.get("id", "")).strip(),
                 name=str(row.get("name", "")).strip(),
                 description=normalize_description(str(row.get("description", "")).strip()),
                 price=str(row.get("price", "0")).strip(),
@@ -115,6 +123,7 @@ def load_products_json(path: Path) -> list[Product]:
 def save_products_json(path: Path, products: list[Product]) -> None:
     raw = [
         {
+            "id": p.id,
             "name": p.name,
             "description": p.description,
             "price": p.price,
