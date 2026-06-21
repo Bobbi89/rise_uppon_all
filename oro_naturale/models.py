@@ -7,9 +7,10 @@ from typing import Any
 
 @dataclass
 class Product:
-    name: str
-    description: str
-    price: str  # Tenuto come stringa per sicurezza durante l'import CSV
+    id: str = ""
+    name: str = ""
+    description: str = ""
+    price: str = "0"
     category: str = ""
     image_url: str = ""
     featured: str = "false"
