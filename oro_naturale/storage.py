@@ -51,10 +51,25 @@ def normalize_description(value: str) -> str:
     return " ".join(value.split())
 
 
+def _parse_details(raw_details: Any) -> dict[str, Any]:
+    """Converte i dettagli extra del prodotto (es. origine, formato) in dict."""
+    if not raw_details:
+        return {}
+    if isinstance(raw_details, dict):
+        return raw_details
+    if isinstance(raw_details, str):
+        try:
+            return json.loads(raw_details)
+        except json.JSONDecodeError:
+            return {"info": raw_details}
+    return {}
+
+
 def load_products_from_csv(path: str) -> list[Product]:
     items: list[Product] = []
     if not os.path.exists(path):
         return items
+    
     with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -62,11 +77,12 @@ def load_products_from_csv(path: str) -> list[Product]:
                 Product(
                     name=row.get("name", "").strip(),
                     description=normalize_description(row.get("description", "").strip()),
-                    price=row.get("price", "").strip(),
+                    price=row.get("price", "0").strip(),
                     category=row.get("category", "").strip(),
                     image_url=row.get("image_url", "").strip(),
-                    featured=row.get("featured", "").strip() or "false",
-                    stock=row.get("stock", "").strip(),
+                    featured=row.get("featured", "false").strip() or "false",
+                    stock=row.get("stock", "0").strip(),
+                    details=_parse_details(row.get("details", "")),
                 )
             )
     return items
@@ -75,19 +91,22 @@ def load_products_from_csv(path: str) -> list[Product]:
 def load_products_json(path: Path) -> list[Product]:
     if not path.exists():
         return []
+    
     with path.open("r", encoding="utf-8") as f:
         raw = json.load(f)
+        
     products: list[Product] = []
     for row in raw:
         products.append(
             Product(
                 name=str(row.get("name", "")).strip(),
                 description=normalize_description(str(row.get("description", "")).strip()),
-                price=str(row.get("price", "")).strip(),
+                price=str(row.get("price", "0")).strip(),
                 category=str(row.get("category", "")).strip(),
                 image_url=str(row.get("image_url", "")).strip(),
                 featured=str(row.get("featured", "false")).strip() or "false",
-                stock=str(row.get("stock", "")).strip(),
+                stock=str(row.get("stock", "0")).strip(),
+                details=_parse_details(row.get("details", {})),
             )
         )
     return products
@@ -103,6 +122,7 @@ def save_products_json(path: Path, products: list[Product]) -> None:
             "image_url": p.image_url,
             "featured": p.featured,
             "stock": p.stock,
+            "details": getattr(p, "details", {}),
         }
         for p in products
     ]
