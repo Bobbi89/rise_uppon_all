@@ -1,13 +1,10 @@
+# oro_naturale/routers/admin.py
 from __future__ import annotations
-
-import json
-from pathlib import Path
 
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from ..catalog import format_products
 from ..context import BotContext
 from ..models import Product
 from ..services import format_company, format_payments, is_admin_user
@@ -26,7 +23,7 @@ def build_admin_router(ctx: BotContext) -> Router:
             await message.answer("Comando riservato agli admin.")
             return
         await message.answer(
-            "Admin:\n"
+            "Pannello Admin:\n"
             "- /orders ultimi ordini\n"
             "- /payments ultimi pagamenti\n"
             "- /shipping_set <PAESE> <costo>\n"
@@ -41,9 +38,10 @@ def build_admin_router(ctx: BotContext) -> Router:
             "- /faq_add <keyword>|<risposta>\n"
             "- /faq_del <keyword>\n"
             "- /faq_list\n"
-            "- /crypto_set <network>|<address>\n"
-            "- /crypto_list\n"
             "- /promo_set <stagione>|<testo>\n"
+            "- /tracking_add <order_id>|<carrier>|<code>|<status>|<url>\n"
+            "- /tracking_del <order_id>\n"
+            "- /reload (ricarica catalogo)\n"
             "- /checkout <importo> [descrizione]"
         )
 
@@ -227,27 +225,6 @@ def build_admin_router(ctx: BotContext) -> Router:
             return
         await message.answer("FAQ:\n" + "\n".join(f"- {k}" for k in sorted(ctx.faq.keys())))
 
-    @router.message(Command("crypto_set"))
-    async def crypto_set(message: Message) -> None:
-        if not admin_only(message):
-            await message.answer("Comando riservato agli admin.")
-            return
-        raw = (message.text or "").replace("/crypto_set", "").strip()
-        parts = [p.strip() for p in raw.split("|", 1)]
-        if len(parts) < 2:
-            await message.answer("Uso: /crypto_set <network>|<address>")
-            return
-        ctx.crypto[parts[0].lower()] = parts[1]
-        ctx.save_crypto()
-        await message.answer("Indirizzo crypto salvato.")
-
-    @router.message(Command("crypto_list"))
-    async def crypto_list(message: Message) -> None:
-        if not admin_only(message):
-            await message.answer("Comando riservato agli admin.")
-            return
-        await message.answer("Indirizzi crypto:\n" + "\n".join(f"- {k}: {v}" for k, v in ctx.crypto.items()))
-
     @router.message(Command("promo_set"))
     async def promo_set(message: Message) -> None:
         if not admin_only(message):
@@ -339,6 +316,8 @@ def build_admin_router(ctx: BotContext) -> Router:
             await message.answer("Comando riservato agli admin.")
             return
         ctx.reload_products(load_products_from_csv(ctx.settings.products_csv) + ctx.custom_products)
-        await message.answer("Catalogo ricaricato.")
+        
+        # Mostra il numero di prodotti caricati
+        await message.answer(f"Catalogo ricaricato. Totale prodotti: {len(ctx.products)}")
 
     return router
