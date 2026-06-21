@@ -22,11 +22,11 @@ CATEGORY_META: dict[str, dict[str, str]] = {
         "emoji": "\U0001f33f",
         "label": "Oli Extravergine",
     },
-    "flavored_oils": {
+    "flavored_oil": {
         "emoji": "\U0001f9c3",
         "label": "Oli Aromatizzati",
     },
-    "wines": {
+    "wine": {
         "emoji": "\U0001f377",
         "label": "Vini",
     },
@@ -34,7 +34,7 @@ CATEGORY_META: dict[str, dict[str, str]] = {
         "emoji": "\U0001f9f4",
         "label": "Cosmetica",
     },
-    "gift_boxes": {
+    "gift_box": {
         "emoji": "\U0001f381",
         "label": "Gift Box",
     },
@@ -121,14 +121,8 @@ def categories_menu(
             )
         rows.append(row)
 
-    # Riga in evidenza (solo se presenti)
     if featured_ids:
-        rows.append(
-            [_btn("\u2b50 In evidenza", "cat:featured")]
-        )
-
-    # Riga offerte (se vuoi aggiungerla in futuro)
-    # rows.append([_btn("\U0001f525 Offerte", "cat:offerte")])
+        rows.append([_btn("\u2b50 In evidenza", "cat:featured")])
 
     return _ikb(*rows)
 
@@ -146,7 +140,6 @@ def product_list_menu(
     """Lista prodotti con paginazione."""
     rows: list[list[InlineKeyboardButton]] = []
 
-    # Paginazione
     start = page * per_page
     end = start + per_page
     page_items = products[start:end]
@@ -154,20 +147,17 @@ def product_list_menu(
     for p in page_items:
         pid = p.get("id", "")
         name = p.get("name", "Prodotto")
-        price = p.get("price", 0)
+        price = p.get("price", 0.0)
         stock = int(p.get("stock", 0))
 
-        # Badge esaurito
         out_of_stock = "\u26d4 " if stock <= 0 else ""
-        price_str = f"\u20ac{price:.2f}"
+        price_str = f"\u20ac{float(price):.2f}"
 
-        # Badge in evidenza
         featured_badge = " \u2b50" if p.get("featured") == "true" or p.get("featured") is True else ""
 
         label = f"{out_of_stock}{name} \u2014 {price_str}{featured_badge}"
         rows.append([_btn(label, f"prod:{pid}")])
 
-    # Navigazione paginazione
     nav_row: list[InlineKeyboardButton] = []
     total_pages = max(1, (len(products) + per_page - 1) // per_page)
 
@@ -179,7 +169,6 @@ def product_list_menu(
     if nav_row:
         rows.append(nav_row)
 
-    # Fondo: torna alle categorie
     rows.append(
         [
             _btn("\u25c0 Categorie", "show_categories"),
@@ -200,25 +189,13 @@ def product_card_menu(
     stock: int,
     is_fav: bool = False,
 ) -> InlineKeyboardMarkup:
-    """
-    Pulsantiera prodotto (3 righe):
-      Riga 1 — Aggiungi al carrello (o esaurito)
-      Riga 2 — [Salva | Dettagli]
-      Riga 3 — [Categoria | Menu]
-    """
     rows: list[list[InlineKeyboardButton]] = []
 
-    # Riga 1: primario
     if stock > 0:
-        rows.append(
-            [_btn("\U0001f6d2 Aggiungi al carrello", f"add:{product_id}")]
-        )
+        rows.append([_btn("\U0001f6d2 Aggiungi al carrello", f"add:{product_id}")])
     else:
-        rows.append(
-            [_btn("\u26d4 Esaurito", "noop")],
-        )
+        rows.append([_btn("\u26d4 Esaurito", "noop")])
 
-    # Riga 2: secondari
     fav_label = "\u2764\ufe0f Salvato" if is_fav else "\U0001f90d Salva"
     rows.append(
         [
@@ -227,7 +204,6 @@ def product_card_menu(
         ]
     )
 
-    # Riga 3: navigazione
     rows.append(
         [
             _btn("\u25c0 Torna alla categoria", f"back_cat:{category}"),
@@ -243,10 +219,8 @@ def product_card_menu(
 # ═══════════════════════════════════════════════════════════════════
 
 def quantity_menu(product_id: str, current_qty: int, max_qty: int) -> InlineKeyboardMarkup:
-    """Selettore quantita per un prodotto nel carrello."""
     rows: list[list[InlineKeyboardButton]] = []
 
-    # Riga bottoni -1 / qty / +1
     qty_row: list[InlineKeyboardButton] = []
     if current_qty > 1:
         qty_row.append(_btn("\u2796 Meno", f"qty:{product_id}:{current_qty - 1}"))
@@ -254,7 +228,7 @@ def quantity_menu(product_id: str, current_qty: int, max_qty: int) -> InlineKeyb
         qty_row.append(_btn("\U0001f5d1\ufe0f Rimuovi", f"qty:{product_id}:0"))
 
     qty_row.append(
-        _btn(f"\U0001f4cf {current_qty} pezz{i if current_qty == 1 else 'i'}", "noop")
+        _btn(f"\U0001f4cf {current_qty} pezz{'o' if current_qty == 1 else 'i'}", "noop")
     )
 
     if current_qty < max_qty:
@@ -263,8 +237,6 @@ def quantity_menu(product_id: str, current_qty: int, max_qty: int) -> InlineKeyb
         qty_row.append(_btn("\U0001f6ab Max", "noop"))
 
     rows.append(qty_row)
-
-    # Torna al carrello
     rows.append([_btn("\u25c0 Torna al carrello", "show_cart")])
 
     return _ikb(*rows)
@@ -275,16 +247,8 @@ def quantity_menu(product_id: str, current_qty: int, max_qty: int) -> InlineKeyb
 # ═══════════════════════════════════════════════════════════════════
 
 def cart_menu(has_items: bool = True) -> InlineKeyboardMarkup:
-    """
-    Pulsantiera carrello:
-      Riga 1 — Procedi al checkout
-      Riga 2 — [Modifica | Coupon]
-      Riga 3 — [Svuota | Continua]
-    """
     if not has_items:
-        return _ikb(
-            [_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")],
-        )
+        return _ikb([_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")])
 
     return _ikb(
         [_btn("\u2705 Procedi al checkout", "checkout_start")],
@@ -300,7 +264,7 @@ def cart_menu(has_items: bool = True) -> InlineKeyboardMarkup:
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Checkout: Spedizione
+#  INLINE KEYBOARD — Checkout
 # ═══════════════════════════════════════════════════════════════════
 
 def shipping_menu() -> InlineKeyboardMarkup:
@@ -310,10 +274,6 @@ def shipping_menu() -> InlineKeyboardMarkup:
         [_btn("\u25c0 Torna al carrello", "show_cart")],
     )
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Checkout: Pagamento
-# ═══════════════════════════════════════════════════════════════════
 
 def payment_menu(total: float) -> InlineKeyboardMarkup:
     return _ikb(
@@ -326,10 +286,6 @@ def payment_menu(total: float) -> InlineKeyboardMarkup:
     )
 
 
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Ordine confermato
-# ═══════════════════════════════════════════════════════════════════
-
 def order_confirmed_menu(order_id: str) -> InlineKeyboardMarkup:
     return _ikb(
         [_btn("\U0001f4e6 Traccia spedizione", f"track:{order_id}")],
@@ -339,10 +295,6 @@ def order_confirmed_menu(order_id: str) -> InlineKeyboardMarkup:
         ],
     )
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Lista ordini
-# ═══════════════════════════════════════════════════════════════════
 
 def orders_menu(order_list: list[dict]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
@@ -359,19 +311,13 @@ def orders_menu(order_list: list[dict]) -> InlineKeyboardMarkup:
     return _ikb(*rows)
 
 
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Ricerca risultati
-# ═══════════════════════════════════════════════════════════════════
-
 def search_results_menu(results: list[dict]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for p in results:
         pid = p.get("id", "")
         name = p.get("name", "Prodotto")
-        price = p.get("price", 0)
-        rows.append(
-            [_btn(f"{name} \u2014 \u20ac{price:.2f}", f"prod:{pid}")]
-        )
+        price = p.get("price", 0.0)
+        rows.append([_btn(f"{name} \u2014 \u20ac{float(price):.2f}", f"prod:{pid}")])
     rows.append(
         [
             _btn("\U0001f50d Nuova ricerca", "search_again"),
@@ -382,41 +328,26 @@ def search_results_menu(results: list[dict]) -> InlineKeyboardMarkup:
 
 
 def search_no_results_menu() -> InlineKeyboardMarkup:
-    """Tastiera quando la ricerca non produce risultati."""
     return _ikb(
         [_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")],
         [_btn("\U0001f3e0 Menu", "main_menu")],
     )
 
 
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Preferiti
-# ═══════════════════════════════════════════════════════════════════
-
 def favorites_menu(products: list[dict]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for p in products:
         pid = p.get("id", "")
         name = p.get("name", "Prodotto")
-        price = p.get("price", 0)
-        rows.append(
-            [_btn(f"{name} \u2014 \u20ac{price:.2f}", f"prod:{pid}")]
-        )
-    rows.append(
-        [_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")]
-    )
+        price = p.get("price", 0.0)
+        rows.append([_btn(f"{name} \u2014 \u20ac{float(price):.2f}", f"prod:{pid}")])
+    rows.append([_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")])
     return _ikb(*rows)
 
 
 def favorites_empty_menu() -> InlineKeyboardMarkup:
-    return _ikb(
-        [_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")],
-    )
+    return _ikb([_btn("\U0001f6cd\ufe0f Vai al catalogo", "show_categories")])
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Profilo
-# ═══════════════════════════════════════════════════════════════════
 
 def profile_menu() -> InlineKeyboardMarkup:
     return _ikb(
@@ -426,20 +357,12 @@ def profile_menu() -> InlineKeyboardMarkup:
     )
 
 
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Info negozio
-# ═══════════════════════════════════════════════════════════════════
-
 def store_menu() -> InlineKeyboardMarkup:
     return _ikb(
         [_btn_url("\U0001f5fa\ufe0f Apri su Google Maps", "https://maps.google.com")],
         [_btn("\U0001f3e0 Menu", "main_menu")],
     )
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Supporto
-# ═══════════════════════════════════════════════════════════════════
 
 def support_menu() -> InlineKeyboardMarkup:
     return _ikb(
@@ -449,10 +372,6 @@ def support_menu() -> InlineKeyboardMarkup:
     )
 
 
-# ═══════════════════════════════════════════════════════════════════
-#  INLINE KEYBOARD — Generici / Navigazione
-# ═══════════════════════════════════════════════════════════════════
-
 def back_to_categories_menu() -> InlineKeyboardMarkup:
     return _ikb(
         [_btn("\u25c0 Categorie", "show_categories")],
@@ -461,15 +380,11 @@ def back_to_categories_menu() -> InlineKeyboardMarkup:
 
 
 def back_to_cart_menu() -> InlineKeyboardMarkup:
-    return _ikb(
-        [_btn("\u25c0 Torna al carrello", "show_cart")],
-    )
+    return _ikb([_btn("\u25c0 Torna al carrello", "show_cart")])
 
 
 def back_to_shipping_menu() -> InlineKeyboardMarkup:
-    return _ikb(
-        [_btn("\u25c0 Modifica spedizione", "checkout_start")],
-    )
+    return _ikb([_btn("\u25c0 Modifica spedizione", "checkout_start")])
 
 
 def order_detail_menu(order_id: str) -> InlineKeyboardMarkup:
@@ -487,30 +402,27 @@ def order_detail_menu(order_id: str) -> InlineKeyboardMarkup:
 # ═══════════════════════════════════════════════════════════════════
 
 def format_product_card(p: dict) -> str:
-    """Genera il testo della scheda prodotto con foto."""
+    """Genera il testo della scheda prodotto."""
     name = p.get("name", "Prodotto")
     description = p.get("description", "")
-    price = p.get("price", 0)
+    price = p.get("price", 0.0)
     stock = int(p.get("stock", 0))
     category = p.get("category", "")
     details = p.get("details", {})
     featured = p.get("featured")
     is_featured = featured is True or featured == "true"
 
-    # Header con badge
     badge_line = ""
     if is_featured:
         badge_line = "\n\u2b50 <b>In evidenza</b>"
 
-    # Stock
     if stock <= 0:
         stock_line = "\n\u26d4 <b>Esaurito</b>"
     elif stock <= 5:
-        stock_line = f"\n\u26a0\ufe0f Solo {stock} rimast{i if stock == 1 else 'i'}!"
+        stock_line = f"\n\u26a0\ufe0f Solo {stock} rimast{'o' if stock == 1 else 'i'}!"
     else:
         stock_line = f"\n\u2705 Disponibile ({stock} pezzi)"
 
-    # Dettagli extra
     detail_lines: list[str] = []
     if isinstance(details, dict):
         origin = details.get("origin")
@@ -529,7 +441,6 @@ def format_product_card(p: dict) -> str:
 
     details_text = "\n".join(detail_lines) if detail_lines else ""
 
-    # Categoria label
     cat_meta = CATEGORY_META.get(category, {})
     cat_label = cat_meta.get("label", category.replace("_", " ").title())
     cat_emoji = cat_meta.get("emoji", "\U0001f4e6")
@@ -544,7 +455,7 @@ def format_product_card(p: dict) -> str:
     text += (
         f"{stock_line}\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-        f"\U0001f4b0 <b>\u20ac {price:.2f}</b>\n"
+        f"\U0001f4b0 <b>\u20ac {float(price):.2f}</b>\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
         f"\U0001f447 Cosa vuoi fare?"
     )
@@ -559,11 +470,7 @@ def format_cart_summary(
     coupon: str | None = None,
     discount: float = 0.0,
 ) -> tuple[str, float]:
-    """
-    Restituisce (testo riepilogo carrello, totale finale).
-    cart_items: lista di {"product_id": str, "qty": int}
-    products_map: dict {product_id: product_dict}
-    """
+    """Restituisce (testo riepilogo carrello, totale finale)."""
     if not cart_items:
         return (
             "\U0001f6d2 Il tuo carrello e' <b>vuoto</b>.\n\n"
@@ -583,38 +490,31 @@ def format_cart_summary(
             continue
 
         name = p.get("name", "Prodotto")
-        price = p.get("price", 0)
+        price = float(p.get("price", 0.0))
         row_total = price * qty
         subtotal += row_total
         total_pieces += qty
 
         lines.append(f"\U0001f33f {name}  x{qty}  \u2192  <b>\u20ac {row_total:.2f}</b>")
 
-    # Spedizione
     if shipping == "home":
         lines.append(f"\n\U0001f4e6 Spedizione a casa:  \u20ac {shipping_cost:.2f}")
     elif shipping == "pickup":
         lines.append("\n\U0001f3ea Ritiro in negozio:  <b>Gratuito</b>")
 
-    # Sconto coupon
     if coupon and discount > 0:
         disc_amount = subtotal * discount
         disc_pct = int(discount * 100)
-        lines.append(
-            f"\U0001f3f7\ufe0f Sconto coupon ({disc_pct}%):  <b>\u2212\u20ac {disc_amount:.2f}</b>"
-        )
+        lines.append(f"\U0001f3f7\ufe0f Sconto coupon ({disc_pct}%):  <b>\u2212\u20ac {disc_amount:.2f}</b>")
 
     total = max(0.0, (subtotal + shipping_cost) * (1 - discount))
-    lines.append(f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501")
-    lines.append(
-        f"\U0001f4b4 <b>Totale: \u20ac {total:.2f}</b>  ({total_pieces} articol{'o' if total_pieces == 1 else 'i'})"
-    )
+    lines.append("\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501")
+    lines.append(f"\U0001f4b4 <b>Totale: \u20ac {total:.2f}</b>  ({total_pieces} articol{'o' if total_pieces == 1 else 'i'})")
 
     return "\n".join(lines), total
 
 
 def format_category_header(category: str, product_count: int, page: int = 0) -> str:
-    """Testo intestazione lista prodotti per categoria."""
     meta = CATEGORY_META.get(category, {})
     emoji = meta.get("emoji", "\U0001f4e6")
     label = meta.get("label", category.replace("_", " ").title())
@@ -628,12 +528,10 @@ def format_featured_header(product_count: int) -> str:
 
 
 def format_search_header(query: str, result_count: int) -> str:
-    """ATTENZIONE: virgolette dritte escape con backslash, NON curve."""
     return f"\U0001f50d <b>Risultati per \"{query}\":</b>  {result_count} trovati"
 
 
 def format_search_empty(query: str) -> str:
-    """ATTENZIONE: virgolette dritte escape con backslash, NON curve."""
     return (
         f"\U0001f615 Nessun risultato per <b>\"{query}\"</b>.\n\n"
         "Prova con un'altra parola chiave."
@@ -667,7 +565,7 @@ def format_order_detail(order: dict) -> str:
     order_id = order.get("id", "")
     date = order.get("date", "")
     status = order.get("status", "")
-    total = order.get("total", 0)
+    total = float(order.get("total", 0.0))
     items = order.get("items", "")
 
     text = (
