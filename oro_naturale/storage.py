@@ -1,151 +1,139 @@
-# routers/public.py
+# ═══════════════════════════════════════════════════════════════════
+#  Oro Naturale — Storage
+#  FileStore: gestione JSON su disco
+#  load_products_json / save_products_json: serializzazione prodotti
+#
+#  NOTA: questo modulo NON importa BotContext per evitare
+#  il circular import (context → storage → context).
+#  BotContext riceve un'istanza di FileStore già costruita.
+# ═══════════════════════════════════════════════════════════════════
+
 from __future__ import annotations
 
-from aiogram import Router, F
-from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+import json
+import logging
+from pathlib import Path
+from typing import Any
 
-from ..context import BotContext
-from ..catalog import product_price_value, product_key
-from ..keyboards import (
-    main_menu, categories_menu, product_list_menu, product_card_menu,
-    cart_menu, store_menu,
-    format_category_header, format_product_card, format_store_info
-)
+logger = logging.getLogger(__name__)
 
 
-def build_public_router(ctx: BotContext) -> Router:
-    router = Router()
+# ═══════════════════════════════════════════════════════════════════
+#  FileStore
+# ═══════════════════════════════════════════════════════════════════
 
-    @router.message(Command("start"))
-    async def cmd_start(message: Message):
-        await message.answer(
-            "👋 Ciao! Benvenuto su <b>Oro Naturale</b>.\n\n"
-            "Sfoglia il nostro catalogo di oli, vini e cosmetici!",
-            reply_markup=main_menu()
-        )
+class FileStore:
+    """
+    Wrapper per lettura/scrittura di file JSON in una directory base.
 
-    @router.message(F.text == "🛍️ Catalogo")
-    async def txt_catalog(message: Message):
-        featured_ids = [p.id or product_key(p) for p in ctx.products if p.featured.lower() == "true"]
-        await message.answer(
-            "📂 <b>Scegli una categoria:</b>",
-            reply_markup=categories_menu(featured_ids if featured_ids else None)
-        )
+    Uso tipico:
+        store = FileStore(Path("/app/data"))
+        data  = store.load_json("company.json", default={})
+        store.save_json("company.json", data)
+        path  = store.json_path("custom_products.json")
+    """
 
-    @router.message(F.text == "🛒 Carrello")
-    async def txt_cart(message: Message):
-        # Carrello vuoto per ora
-        await message.answer(
-            "🛒 Il tuo carrello è <b>vuoto</b>.\n\nAggiungi qualcosa dal catalogo!",
-            reply_markup=cart_menu(has_items=False)
-        )
+    def __init__(self, base_dir: Path | str) -> None:
+        self.base_dir = Path(base_dir)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    @router.message(F.text == "📍 Negozio")
-    async def txt_store(message: Message):
-        await message.answer(format_store_info(), reply_markup=store_menu())
+    # ── path helper ────────────────────────────────────────────────
 
-    @router.callback_query(F.data == "show_categories")
-    async def cb_show_categories(callback: CallbackQuery):
-        featured_ids = [p.id or product_key(p) for p in ctx.products if p.featured.lower() == "true"]
-        await callback.message.edit_text(
-            "📂 <b>Scegli una categoria:</b>",
-            reply_markup=categories_menu(featured_ids if featured_ids else None)
-        )
-        await callback.answer()
+    def json_path(self, filename: str) -> Path:
+        """Restituisce il Path assoluto per un file nella base_dir."""
+        return self.base_dir / filename
 
-    @router.callback_query(F.data.startswith("cat:"))
-    @router.callback_query(F.data.startswith("cat_page:"))
-    async def cb_show_products(callback: CallbackQuery):
-        data = callback.data
-        page = 0
-        if data.startswith("cat_page:"):
-            parts = data.split(":")
-            category = parts[1]
-            page = int(parts[2])
-        else:
-            category = data.split(":", 1)[1]
-            
-        if category == "featured":
-            prods = [p for p in ctx.products if p.featured.lower() == "true"]
-        else:
-            prods = [p for p in ctx.products if p.category == category]
-            
-        if not prods:
-            await callback.answer("Nessun prodotto in questa categoria.", show_alert=True)
-            return
-            
-        prod_dicts = []
-        for p in prods:
-            price = product_price_value(p) or 0.0
-            prod_dicts.append({
-                "id": p.id or product_key(p),
-                "name": p.name,
-                "price": price,
-                "stock": int(p.stock) if p.stock.isdigit() else 0,
-                "featured": p.featured
-            })
-            
-        header = format_category_header(category, len(prods), page)
-        kb = product_list_menu(prod_dicts, category, page)
-        
-        await callback.message.edit_text(header, reply_markup=kb)
-        await callback.answer()
+    # ── lettura ───────────────────────────────────────────────────
 
-    @router.callback_query(F.data.startswith("back_cat:"))
-    async def cb_back_to_cat(callback: CallbackQuery):
-        category = callback.data.split(":", 1)[1]
-        # Simuliamo il click sulla categoria per riutilizzare la logica
-        callback.data = f"cat:{category}"
-        await cb_show_products(callback)
+    def load_json(self, filename: str, default: Any = None) -> Any:
+        """
+        Legge un file JSON dalla base_dir.
+        Restituisce `default` se il file non esiste o è corrotto.
+        """
+        path = self.json_path(filename)
+        if not path.exists():
+            logger.debug("load_json: %s non trovato, uso default", path)
+            return default if default is not None else {}
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("load_json: errore lettura %s — %s", path, exc)
+            return default if default is not None else {}
 
-    @router.callback_query(F.data.startswith("prod:"))
-    async def cb_show_product(callback: CallbackQuery):
-        pid = callback.data.split(":", 1)[1]
-        product = next((p for p in ctx.products if (p.id or product_key(p)) == pid), None)
-        
-        if not product:
-            await callback.answer("Prodotto non trovato.", show_alert=True)
-            return
-            
-        price = product_price_value(product) or 0.0
-        stock = int(product.stock) if product.stock.isdigit() else 0
-        
-        prod_dict = {
-            "id": product.id or product_key(product),
-            "name": product.name,
-            "description": product.description,
-            "price": price,
-            "stock": stock,
-            "category": product.category,
-            "details": product.details,
-            "featured": product.featured
-        }
-        
-        text = format_product_card(prod_dict)
-        kb = product_card_menu(prod_dict["id"], product.category, stock)
-        
-        # Se c'è un'immagine, mandiamo una nuova foto, altrimenti editiamo il testo
-        if product.image_url:
-            await callback.message.answer_photo(
-                photo=product.image_url,
-                caption=text,
-                reply_markup=kb
-            )
+    # ── scrittura ─────────────────────────────────────────────────
+
+    def save_json(self, filename: str, data: Any) -> None:
+        """
+        Scrive `data` come JSON nella base_dir.
+        Crea la directory se non esiste.
+        """
+        path = self.json_path(filename)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8") as fh:
+                json.dump(data, fh, ensure_ascii=False, indent=2)
+            logger.debug("save_json: salvato %s", path)
+        except OSError as exc:
+            logger.error("save_json: errore scrittura %s — %s", path, exc)
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Prodotti — serializzazione JSON
+#  Import locale di Product qui (models → storage, nessun ciclo)
+# ═══════════════════════════════════════════════════════════════════
+
+def load_products_json(path: Path | str) -> list:
+    """
+    Carica una lista di Product da un file JSON.
+    Restituisce lista vuota se il file non esiste o è corrotto.
+
+    Importa Product inline per evitare import circolari in fase
+    di inizializzazione del package.
+    """
+    from .models import Product  # import locale — sicuro, models non importa storage
+
+    path = Path(path)
+    if not path.exists():
+        logger.debug("load_products_json: %s non trovato", path)
+        return []
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            raw: list[dict] = json.load(fh)
+        products: list[Product] = []
+        for item in raw:
             try:
-                await callback.message.delete()
-            except:
-                pass
-        else:
-            await callback.message.edit_text(text, reply_markup=kb)
-            
-        await callback.answer()
+                products.append(Product(**item))
+            except TypeError as exc:
+                logger.warning("load_products_json: record ignorato — %s", exc)
+        logger.debug("load_products_json: caricati %d prodotti da %s", len(products), path)
+        return products
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("load_products_json: errore lettura %s — %s", path, exc)
+        return []
 
-    @router.callback_query(F.data == "main_menu")
-    async def cb_main_menu(callback: CallbackQuery):
-        await callback.message.edit_text(
-            "🏠 Sei al menu principale.\nUsa la tastiera in basso per continuare."
-        )
-        await callback.answer()
 
-    return router
+def save_products_json(path: Path | str, products: list) -> None:
+    """
+    Salva una lista di Product in un file JSON.
+    Ogni Product viene serializzato con dataclasses.asdict se disponibile,
+    altrimenti con __dict__.
+    """
+    import dataclasses
+
+    path = Path(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        serialized: list[dict] = []
+        for p in products:
+            if dataclasses.is_dataclass(p):
+                serialized.append(dataclasses.asdict(p))
+            elif hasattr(p, "__dict__"):
+                serialized.append(p.__dict__)
+            else:
+                serialized.append(dict(p))
+        with path.open("w", encoding="utf-8") as fh:
+            json.dump(serialized, fh, ensure_ascii=False, indent=2)
+        logger.debug("save_products_json: salvati %d prodotti in %s", len(products), path)
+    except OSError as exc:
+        logger.error("save_products_json: errore scrittura %s — %s", path, exc)
