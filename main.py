@@ -9,7 +9,7 @@ from oro_naturale.context import BotContext
 from oro_naturale.routers.admin import build_admin_router
 from oro_naturale.routers.public import build_public_router
 from oro_naturale.services import followup_worker
-from oro_naturale.storage import FileStore, load_products_from_csv
+from oro_naturale.storage import FileStore, load_products_from_db
 
 
 async def main() -> None:
