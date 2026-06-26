@@ -8,7 +8,7 @@ from aiogram.types import Message
 from ..context import BotContext
 from ..models import Product
 from ..services import format_company, format_payments, is_admin_user
-from ..storage import load_products_from_csv, save_products_json
+from ..storage import load_products_from_db, save_products_json
 
 
 def build_admin_router(ctx: BotContext) -> Router:
@@ -180,7 +180,8 @@ def build_admin_router(ctx: BotContext) -> Router:
             )
         )
         save_products_json(ctx.store.json_path("custom_products.json"), ctx.custom_products)
-        ctx.reload_products(load_products_from_csv(ctx.settings.products_csv) + ctx.custom_products)
+        # Ora usa load_products_from_db invece di load_products_from_csv
+        ctx.reload_products(load_products_from_db() + ctx.custom_products)
         await message.answer("Prodotto aggiunto e salvato.")
 
     @router.message(Command("product_del"))
@@ -191,7 +192,8 @@ def build_admin_router(ctx: BotContext) -> Router:
         name = (message.text or "").replace("/product_del", "").strip()
         ctx.custom_products = [p for p in ctx.custom_products if p.name.lower() != name.lower()]
         save_products_json(ctx.store.json_path("custom_products.json"), ctx.custom_products)
-        ctx.reload_products(load_products_from_csv(ctx.settings.products_csv) + ctx.custom_products)
+        # Ora usa load_products_from_db invece di load_products_from_csv
+        ctx.reload_products(load_products_from_db() + ctx.custom_products)
         await message.answer("Prodotto rimosso se presente.")
 
     @router.message(Command("faq_add"))
@@ -315,7 +317,8 @@ def build_admin_router(ctx: BotContext) -> Router:
         if not admin_only(message):
             await message.answer("Comando riservato agli admin.")
             return
-        ctx.reload_products(load_products_from_csv(ctx.settings.products_csv) + ctx.custom_products)
+        # Ora usa load_products_from_db invece di load_products_from_csv
+        ctx.reload_products(load_products_from_db() + ctx.custom_products)
         
         # Mostra il numero di prodotti caricati
         await message.answer(f"Catalogo ricaricato. Totale prodotti: {len(ctx.products)}")
