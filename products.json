@@ -1,0 +1,299 @@
+[
+  {
+    "id": "6915c55b12c4e690ecc1b719",
+    "name_it": "Olio Extravergine di Oliva 'ORO' 250ml",
+    "price": 12.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/7d3f5cd10_olio-oro-250ml.png",
+    "description_it": "Olio extravergine di oliva ORO in formato tascabile da 250ml. Perfetto per degustazioni, regali o per chi vuole provare la qualità Oro Naturale.",
+    "attributes": {"harvest_year":"2025","volume":"250ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "6914b82805cfed02a50a7da4",
+    "name_it": "Olio EVO Blend Bio Ronci 500ml",
+    "price": 19.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/c168e4436_olio-blend-bio.jpg",
+    "description_it": "Olio extravergine di oliva biologico blend premium. Sapore equilibrato e versatile, perfetto per uso quotidiano. Certificato biologico.",
+    "attributes": {"harvest_year":"2025","volume":"500ml","origin":"Italia - Umbria"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e19b",
+    "name_it": "Gift Box Olio Extravergine Italiano",
+    "price": 99.95,
+    "category": "gift_boxes",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/c76fce295_Gift-Box-Olio-Extravergine-Italiano.JPG",
+    "description_it": "Set regalo premium con i migliori 3 oli extravergini italiani in elegante confezione. Il regalo perfetto per gli amanti del buon olio.",
+    "attributes": {"characteristics":["Premium","Elegante","Eccellenza italiana","Gift box"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e19a",
+    "name_it": "Gift Box Extravergine & Aromatizzati",
+    "price": 79.95,
+    "category": "gift_boxes",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/7eee3bf27_Gift-Box-Extravergine-Aromatizzati.jpg",
+    "description_it": "Elegante confezione regalo con selezione di 3 oli extravergini e aromatizzati. Perfetta per regali aziendali o occasioni speciali.",
+    "attributes": {"characteristics":["Confezione elegante","Selezione premium","Idea regalo"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e196",
+    "name_it": "Latte Detergente Struccante",
+    "price": 29.95,
+    "category": "cosmetics",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/f26e7cb50_spumante-brut-1742.jpg",
+    "description_it": "Latte detergente struccante delicato all'olio d'oliva. Pulisce in profondità rispettando il pH naturale della peau.",
+    "attributes": {"characteristics":["Delicato","Struccante","Detergente","Naturale"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e183",
+    "name_it": "Olio Extravergine Monocultivar Moraiolo 500ml",
+    "price": 19.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/6a8228dba_olio-moraiolo.jpg",
+    "description_it": "Olio extravergine monocultivar da olive Moraiolo. Sapore intenso e deciso, con note fruttate. Perfetto per bruschette e piatti robusti.",
+    "attributes": {"harvest_year":"2025","volume":"500ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e181",
+    "name_it": "Olio di Avocado di Sicilia 100% Italiano",
+    "price": 59.95,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/27e8d20ec_Avocado-bottiglia-olio-500ml.jpg",
+    "description_it": "Ottenuto da avocado selezionati alle pendici dell’Etna, è ricco di grassi buoni, omega 3 e vitamine E e D.",
+    "attributes": {"origin":"Sicilia Italia","volume":"500ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e180",
+    "name_it": "Olio EVO Premium 'DOC' 500ml",
+    "price": 39.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/f26e7cb50_spumante-brut-1742.jpg",
+    "description_it": "Olio extravergine di oliva DOC di qualità superiore. Premium selection con certificazione di origine controllata.",
+    "attributes": {"harvest_year":"2025/2026","volume":"500ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e197",
+    "name_it": "Sapone Vegetale Biologico",
+    "price": 9.95,
+    "category": "cosmetics",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/06cbf1863_sapone-vegetale-ronci.jpg",
+    "description_it": "Sapone vegetal biologico all'olio d'oliva. Deterge delicatamente rispettando la naturale idratazione della pelle.",
+    "attributes": {"origin":"Italy","characteristics":["Biologico","Vegetale","Delicato"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e18e",
+    "name_it": "Cabernet Franc",
+    "price": 23.77,
+    "category": "wines",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/94bc01c94_Cabernet-franc.jpg",
+    "description_it": "Vino rosso Cabernet Franc di qualità superiore dalle migliori cantine italiane. Corposo e strutturato.",
+    "attributes": {"origin":"Italia","characteristics":["Vino rosso","Corposo"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e18b",
+    "name_it": "Olio EVO al Rosmarino 100ml",
+    "price": 9.52,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/02d1cb014_aromatizzato-rosmarino.jpg",
+    "description_it": "Olio EVO Artigianale al Rosmarino 100% Italiano. Aromatico e intenso, ideale per arrosti, patate e focacce.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e18d",
+    "name_it": "Olio EVO all'Arancia 100ml",
+    "price": 12.95,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/35a697b50_aromatizzato-arancia.jpg",
+    "description_it": "Olio EVO Artigianale all'Arancia 100% Italiano. Dolce e agrumato, ideale per insalate, dolci e piatti creativi.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e187",
+    "name_it": "Olio EVO al Peperoncino 100ml",
+    "price": 9.95,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/4aa26c339_aromatizzato-peperoncino.jpg",
+    "description_it": "Olio EVO Artigianale al Peperoncino 100% Italiano. Gusto intenso e piccante, perfetto per pizza e pasta.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e195",
+    "name_it": "Crema Viso Notte",
+    "price": 28.52,
+    "category": "cosmetics",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/04c0c6c0e_crema-viso-notte-ronci.jpg",
+    "description_it": "Crema viso notte rigenerante all'olio d'oliva. Ripara e rigenera la pelle durante il riposo.",
+    "attributes": {"characteristics":["Rigenerante","Notte","Anti-età"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e191",
+    "name_it": "Spumante Brut 1742",
+    "price": 31.97,
+    "category": "wines",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/f26e7cb50_spumante-brut-1742.jpg",
+    "description_it": "Spumante Brut metodo classico. Bollicine fini e persistenti, elegante e raffinato.",
+    "attributes": {"origin":"Italia","characteristics":["Spumante","Metodo classico"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e198",
+    "name_it": "Scrub Viso all'Olio Extravergine",
+    "price": 28.69,
+    "category": "cosmetics",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/544f2e974_scrub-viso-all-olio-di-oliva-evo.jpg",
+    "description_it": "Scrub viso esfoliante all'olio extravergine di oliva. Elimina le cellule morte e illumina la pelle.",
+    "attributes": {"characteristics":["Esfoliante","Illuminante"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e18a",
+    "name_it": "Olio EVO al Limone 100ml",
+    "price": 12.95,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/242aff47a_aromatizzato-limone.jpg",
+    "description_it": "Olio EVO Artigianale al Limone 100% Italiano. Fresco e agrumato, perfetto per pesce e insalate.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e184",
+    "name_it": "Olio Extravergine Monocultivar Moraiolo 250ml",
+    "price": 12.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/6a8228dba_olio-moraiolo.jpg",
+    "description_it": "Olio extravergine monocultivar da olive Moraiolo in formato tascabile. Ideale per degustazioni.",
+    "attributes": {"volume":"250ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e186",
+    "name_it": "Olio Extravergine Monocultivar Frantoio 250ml",
+    "price": 12.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/3f7e52d41_olio-frantoio-250ml.jpg",
+    "description_it": "Olio extravergine monocultivar da olive Frantoio in formato da 250ml. Perfetto da portare in tavola.",
+    "attributes": {"harvest_year":"2025","volume":"250ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e192",
+    "name_it": "Spumante 48 Mesi Brut 1742",
+    "price": 44.95,
+    "category": "wines",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/ba9f73cd5_1742-pass-dosemetodo-classico.png",
+    "description_it": "Spumante Brut Premium invecchiato 48 mesi. Complessità e finezza straordinarie.",
+    "attributes": {"origin":"Italia","characteristics":["48 mesi","Premium"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e188",
+    "name_it": "Olio EVO al Tartufo 100ml",
+    "price": 12.34,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/915ce542a_aromatizzato-tartufo-nero.jpg",
+    "description_it": "Olio EVO al Tartufo 100% Italiano. Aroma intenso e raffinato, perfetto per primi piatti e risotti.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e190",
+    "name_it": "Mamma Mia - Vino Passito",
+    "price": 59.95,
+    "category": "wines",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/68a7db8e1_Mamma-mia-passito-1742.jpg",
+    "description_it": "Vino passito dolce e aromatico, invecchiato con cura. Perfetto pentru dessert.",
+    "attributes": {"origin":"Italia","volume":"500"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e17f",
+    "name_it": "Olio EVO Premium 'Sien Die' 750ml",
+    "price": 45.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/18e805e11_Olio-EVO-Premium-Sien-Die-750ml.jpg",
+    "description_it": "Olio extravergine di oliva di qualità superiore, prodotto in quantità limitata. Aromatico e intenso.",
+    "attributes": {"harvest_year":"2025","volume":"750ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e194",
+    "name_it": "Crema Corpo Biologica",
+    "price": 29.51,
+    "category": "cosmetics",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/7e5d2e976_crema-corpo-ronci.jpg",
+    "description_it": "Crema corpo biologica all'olio d'oliva extravergine. Nutre e idrata la pelle in profondità.",
+    "attributes": {"characteristics":["Biologica","Olio d'oliva"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e17e",
+    "name_it": "Olio Extravergine di Oliva 'ORO' 5L",
+    "price": 149.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/4c46f645a_oro-5l.jpg",
+    "description_it": "Olio extravergine di oliva italiano certificato, dalle colline del Subasio. Pratico formato da 5 litri.",
+    "attributes": {"harvest_year":"2025","volume":"5L","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e18f",
+    "name_it": "Il Bisbetico Domato - Montefalco Sagrantino",
+    "price": 149.95,
+    "category": "wines",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/75e7e5cbc_Il-Bisbetico-Domato-Montefalco-sagrantino-DOCG-1742.jpg",
+    "description_it": "Prestigioso Montefalco Sagrantino DOCG, vino rosso corposo e strutturato dalle colline umbre.",
+    "attributes": {"origin":"Montefalco, Umbria","characteristics":["Sagrantino","Corposo"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e193",
+    "name_it": "Spumante Rose Brut 1742",
+    "price": 39.95,
+    "category": "wines",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/f26e7cb50_spumante-brut-1742.jpg",
+    "description_it": "Spumante Rosè Brut elegante e fruttato. Note di frutti rossi, perfetto per brunch.",
+    "attributes": {"origin":"Italia","volume":"750ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e185",
+    "name_it": "Olio Extravergine Monocultivar Frantoio 500ml",
+    "price": 19.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/e246cf0ab_olio-frantoio-500ml.jpg",
+    "description_it": "Olio extravergine monocultivar da olive Frantoio. Delicato e aromatico.",
+    "attributes": {"volume":"500ml","origin":"Umbria, Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e18c",
+    "name_it": "Olio EVO all'Aglio 100ml",
+    "price": 9.95,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/34308b191_aromatizzato-aglio.jpg",
+    "description_it": "Olio EVO Artigianale all'Aglio 100% Italiano. Sapore intenso, perfetto per bruschette.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e199",
+    "name_it": "Olio per Massaggi all'Olio Extravergine",
+    "price": 34.43,
+    "category": "cosmetics",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/7fd40245c_olio-per-massaggi-all-olio-evo.jpg",
+    "description_it": "Olio per massaggi rilassanti all'olio extravergine di oliva. Nutre la pelle.",
+    "attributes": {"characteristics":["Rilassante","Massaggi"]}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e182",
+    "name_it": "Olio Extravergine di Oliva Biologico 500ml",
+    "price": 29.75,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/128f960c8_Olio-Extravergine-di-Oliva-Biologico-500ml.jpg",
+    "description_it": "Olio extravergine di oliva biologico certificato. Coltivato con metodi naturali.",
+    "attributes": {"harvest_year":"2025","volume":"500ml","origin":"Italia"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e189",
+    "name_it": "Olio EVO al Basilico 100ml",
+    "price": 9.95,
+    "category": "flavored_oils",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/9af0a12b3_aromatizzatobasilico.jpg",
+    "description_it": "Olio EVO Artigianale al Basilico 100% Italiano. Fresco e aromatico.",
+    "attributes": {"origin":"Italia","volume":"100ml"}
+  },
+  {
+    "id": "690f13c369e3610ea9b1e17d",
+    "name_it": "Olio Extravergine di Oliva 'ROSSI' 500ml",
+    "price": 15.95,
+    "category": "extra_virgin_olive_oil",
+    "image_url": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/a41e14b29_rossi.jpg",
+    "description_it": "L'olio extravergine di oliva Rossi 100% italiano, estratto a freddo.",
+    "attributes": {"harvest_year":"2025","volume":"500ml","origin":"Umbria, Italia"}
+  }
+]
