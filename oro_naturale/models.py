@@ -81,9 +81,9 @@ class Payment:
     currency: str
     status: str
     payment_method: str
-    payment_intent_id: str | None = None
     created_at: datetime
     updated_at: datetime
+    payment_intent_id: str | None = None
     error_message: str | None = None
     metadata: dict[str, Any] | None = None
 
