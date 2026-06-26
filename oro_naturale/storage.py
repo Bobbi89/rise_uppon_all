@@ -1,7 +1,8 @@
 # ═══════════════════════════════════════════════════════════════════
 #  Oro Naturale — Storage
 #  FileStore: gestione JSON su disco
-#  load_products_json / save_products_json: serializzazione prodotti
+#  load_products_from_db: carica prodotti da PostgreSQL
+#  save_products_json: serializzazione prodotti
 #
 #  NOTA: questo modulo NON importa BotContext per evitare
 #  il circular import (context → storage → context).
@@ -12,10 +13,17 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
 logger = logging.getLogger(__name__)
+
+# Connessione PostgreSQL (Railway)
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -79,17 +87,59 @@ class FileStore:
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  Prodotti — serializzazione JSON
-#  Import locale di Product qui (models → storage, nessun ciclo)
+#  Prodotti — carica da PostgreSQL
+# ═══════════════════════════════════════════════════════════════════
+
+def load_products_from_db() -> list:
+    """
+    Carica tutti i prodotti dalla tabella PostgreSQL `products`.
+    Restituisce lista vuota se errore.
+    """
+    from .models import Product  # import locale — sicuro, models non importa storage
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM products")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        products = []
+        for row in rows:
+            try:
+                products.append(Product(
+                    id=row["id"],
+                    name=row["name"],
+                    description=row["description"],
+                    price=float(row["price"]),
+                    image_url=row["image_url"],
+                    category=row["category"],
+                    stock=row["stock"],
+                    featured=row["featured"],
+                    is_sample=row["is_sample"],
+                    details=row["details"],
+                    translations=row["translations"],
+                    created_date=row["created_date"],
+                    updated_date=row["updated_date"],
+                    created_by_id=row["created_by_id"],
+                ))
+            except (KeyError, ValueError, TypeError) as exc:
+                logger.warning("load_products_from_db: record ignorato — %s", exc)
+        logger.debug("load_products_from_db: caricati %d prodotti", len(products))
+        return products
+    except Exception as exc:
+        logger.error("load_products_from_db: errore connessione/query — %s", exc)
+        return []
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Prodotti — serializzazione JSON (per custom_products)
 # ═══════════════════════════════════════════════════════════════════
 
 def load_products_json(path: Path | str) -> list:
     """
     Carica una lista di Product da un file JSON.
     Restituisce lista vuota se il file non esiste o è corrotto.
-
-    Importa Product inline per evitare import circolari in fase
-    di inizializzazione del package.
     """
     from .models import Product  # import locale — sicuro, models non importa storage
 
