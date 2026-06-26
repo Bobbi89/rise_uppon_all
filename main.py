@@ -17,7 +17,8 @@ async def main() -> None:
     store = FileStore(settings.data_dir)
     ctx = BotContext(settings=settings, store=store)
     ctx.refresh_from_store()
-    ctx.reload_products(load_products_from_csv(settings.products_csv) + ctx.custom_products)
+    # Ora carica i prodotti dal DB PostgreSQL
+    ctx.reload_products(load_products_from_db() + ctx.custom_products)
 
     bot = Bot(token=settings.telegram_bot_token)
     dp = Dispatcher()
