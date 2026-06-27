@@ -1,25 +1,70 @@
+# oro_naturale/routers/public.py
 from __future__ import annotations
 
-import asyncio
 import time
-from typing import Optional
+from typing import Any
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from ..catalog import (
-    CATEGORY_LABELS,
     category_label,
     find_products,
     format_product,
     format_products,
     group_by_category,
-    recommendations_for,
     product_key,
+    recommendations_for,
 )
 from ..context import BotContext
-from ..keyboards import categories_menu, cart_menu, main_menu, quantity_menu
+from ..keyboards import (
+    # Costanti testo bottoni reply keyboard
+    BTN_CARRELLO,
+    BTN_CATALOGO,
+    BTN_CERCA,
+    BTN_NEGOZIO,
+    BTN_ORDINI,
+    BTN_PREFERITI,
+    BTN_PROFILO,
+    BTN_SUPPORTO,
+    # Formatters testo
+    format_cart_summary,
+    format_favorites_empty,
+    format_favorites_header,
+    format_order_confirmed,
+    format_order_detail,
+    format_orders_header,
+    format_profile,
+    format_review_request,
+    format_search_empty,
+    format_search_header,
+    format_store_info,
+    format_support_info,
+    format_tracking_message,
+    # Keyboards
+    cart_menu,
+    categories_menu,
+    favorites_empty_menu,
+    favorites_menu,
+    main_menu,
+    order_confirmed_menu,
+    order_detail_menu,
+    orders_menu,
+    payment_menu,
+    product_card_menu,
+    profile_menu,
+    quantity_menu,
+    review_menu,
+    search_no_results_menu,
+    search_results_menu,
+    shipping_menu,
+    store_menu,
+    support_menu,
+    tracking_menu,
+    welcome_menu,
+    ORDER_STATUS_EMOJI,
+)
 from ..services import (
     create_stripe_link,
     detect_b2b,
@@ -28,10 +73,9 @@ from ..services import (
     detect_preference,
     format_company,
     format_payments,
-    is_admin_user,
+    natural_business_reply,
     parse_total,
     process_order_payload,
-    natural_business_reply,
     recommend_upsell,
 )
 
@@ -39,7 +83,11 @@ from ..services import (
 def build_public_router(ctx: BotContext) -> Router:
     router = Router()
 
-    def customer_record(user_id: int) -> dict:
+    # ─────────────────────────────────────────────────────────────
+    #  Helper utente / carrello
+    # ─────────────────────────────────────────────────────────────
+
+    def customer_record(user_id: int) -> dict[str, Any]:
         record = ctx.customers.get(str(user_id), {})
         record.setdefault("stage", "idle")
         record.setdefault("cart", {})
@@ -49,7 +97,7 @@ def build_public_router(ctx: BotContext) -> Router:
         ctx.customers[str(user_id)] = record
         ctx.save_customers()
 
-    def get_product(key: str):
+    def get_product_by_key(key: str):
         for product in ctx.products:
             if product_key(product) == key:
                 return product
@@ -63,32 +111,58 @@ def build_public_router(ctx: BotContext) -> Router:
         record["cart"] = cart
         save_customer(user_id, record)
 
-    def add_to_cart(user_id: int, product_name: str, qty: int) -> None:
+    def add_to_cart(user_id: int, product_key_str: str, qty: int) -> None:
         cart = get_cart(user_id)
-        cart[product_name] = cart.get(product_name, 0) + max(1, qty)
+        cart[product_key_str] = cart.get(product_key_str, 0) + max(1, qty)
         set_cart(user_id, cart)
 
-    def remove_from_cart(user_id: int, product_name: str) -> None:
+    def remove_from_cart(user_id: int, product_key_str: str) -> None:
         cart = get_cart(user_id)
-        cart.pop(product_name, None)
+        cart.pop(product_key_str, None)
         set_cart(user_id, cart)
 
     def clear_cart(user_id: int) -> None:
         set_cart(user_id, {})
 
-    def cart_summary(user_id: int) -> str:
+    def cart_count(user_id: int) -> int:
+        return sum(get_cart(user_id).values())
+
+    def cart_text_summary(user_id: int) -> str:
         cart = get_cart(user_id)
         if not cart:
             return "Il tuo carrello è vuoto."
-        lines = ["Carrello:"]
+        lines = ["🛒 <b>Carrello:</b>"]
         for key, qty in cart.items():
-            product = get_product(key)
+            product = get_product_by_key(key)
             if product and product.price:
-                price = float(product.price.replace(",", "."))
-                lines.append(f"- {product.name} x{qty} = EUR {price * qty:.2f}")
+                price = float(str(product.price).replace(",", "."))
+                lines.append(f"• {product.name} x{qty} = € {price * qty:.2f}")
             else:
-                lines.append(f"- {key} x{qty}")
+                lines.append(f"• {key} x{qty}")
         return "\n".join(lines)
+
+    def build_orders_list(user_id: int) -> list[dict]:
+        """Costruisce la lista ordini nel formato richiesto da orders_menu()."""
+        record = customer_record(user_id)
+        result = []
+        for o in record.get("orders", []):
+            result.append({
+                "id":     o.get("order_id", ""),
+                "date":   _ts_to_date(o.get("ts", 0)),
+                "total":  o.get("total", 0.0),
+                "status": o.get("status", "pending"),
+            })
+        return result
+
+    def _ts_to_date(ts: int) -> str:
+        if not ts:
+            return "—"
+        import datetime
+        return datetime.datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M")
+
+    # ─────────────────────────────────────────────────────────────
+    #  SCREEN 01 — /start  /help
+    # ─────────────────────────────────────────────────────────────
 
     @router.message(Command("start"))
     async def start(message: Message) -> None:
@@ -96,158 +170,801 @@ def build_public_router(ctx: BotContext) -> Router:
         if user_id:
             record = customer_record(user_id)
             record["chat_id"] = message.chat.id
-            if not record.get("stage"):
-                record["stage"] = "qualify"
+            record.setdefault("stage", "qualify")
             save_customer(user_id, record)
+            count = cart_count(user_id)
+        else:
+            count = 0
+
         await message.answer(
-            "<b>Oro Naturale</b>\n"
+            "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
             "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.\n\n"
-            "<b>Scorciatoie rapide</b>\n"
-            "• catalogo e carrello\n"
-            "• ordine e checkout Stripe\n"
-            "• spedizione e tracking\n"
-            "• area B2B per ristoratori\n\n"
-            "Puoi anche scrivere direttamente <i>voglio fare un ordine</i>.",
-            reply_markup=main_menu(),
+            "Usa il menu qui sotto per navigare il catalogo, "
+            "gestire il carrello e completare i tuoi ordini.",
+            reply_markup=main_menu(count),
             parse_mode="HTML",
+        )
+        await message.answer(
+            "Cosa vuoi fare oggi?",
+            reply_markup=welcome_menu(),
         )
 
     @router.message(Command("help"))
     async def help_cmd(message: Message) -> None:
         await start(message)
 
-    @router.message(F.text == "🛒 Catalogo")
+    # ── callback dal welcome_menu ──────────────────────────────────
+
+    @router.callback_query(F.data == "main_menu")
+    async def cb_main_menu(callback: CallbackQuery) -> None:
+        user_id = callback.from_user.id if callback.from_user else 0
+        count   = cart_count(user_id)
+        await callback.message.answer(
+            "🏠 Menu principale",
+            reply_markup=main_menu(count),
+        )
+        await callback.answer()
+
+    # ─────────────────────────────────────────────────────────────
+    #  SCREEN 02 — CATALOGO
+    #  Reply keyboard: 🛍️ Catalogo
+    #  Callback: show_categories, cat:*, cat_page:*, prod:*, back_cat:*
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_CATALOGO)
     @router.message(Command("catalogo"))
     async def catalog(message: Message) -> None:
-        groups = group_by_category(ctx.products)
-        categories = [(k, category_label(k)) for k in groups.keys()]
         await message.answer(
-            "Esplora le categorie disponibili:",
-            reply_markup=categories_menu(categories),
+            "🛍️ <b>Catalogo Oro Naturale</b>\n\nScegli una categoria:",
+            reply_markup=categories_menu(),
+            parse_mode="HTML",
         )
 
+    @router.callback_query(F.data == "show_categories")
+    async def cb_show_categories(callback: CallbackQuery) -> None:
+        await callback.message.answer(
+            "🛍️ <b>Catalogo Oro Naturale</b>\n\nScegli una categoria:",
+            reply_markup=categories_menu(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
     @router.callback_query(F.data.startswith("cat:"))
-    async def category(callback: CallbackQuery) -> None:
+    async def cb_category(callback: CallbackQuery) -> None:
         category_name = callback.data.split(":", 1)[1]
-        products = [p for p in ctx.products if p.category == category_name]
+
+        if category_name == "featured":
+            products = [p for p in ctx.products if getattr(p, "featured", False)]
+        else:
+            products = [p for p in ctx.products if p.category == category_name]
+
         if not products:
-            await callback.answer("Nessun prodotto in questa categoria.")
+            await callback.answer("Nessun prodotto in questa categoria.", show_alert=True)
             return
-        await callback.message.answer(f"--- {category_label(category_name)} ---")
+
+        await callback.message.answer(
+            f"<b>{category_label(category_name)}</b> — {len(products)} prodotti",
+            parse_mode="HTML",
+        )
         for product in products[:10]:
-            key = product_key(product)
+            key     = product_key(product)
             caption = format_product(product)
+            stock   = int(getattr(product, "stock", 99))
+            user_id = callback.from_user.id if callback.from_user else 0
+            is_fav  = ctx.is_favorite(user_id, key)
+
+            kb = product_card_menu(key, category_name, stock, is_fav)
+
             if product.image_url:
                 await callback.message.answer_photo(
                     photo=product.image_url,
                     caption=caption,
                     parse_mode="HTML",
-                    reply_markup=quantity_menu(key, 1),
+                    reply_markup=kb,
                 )
             else:
                 await callback.message.answer(
                     caption,
-                    reply_markup=quantity_menu(key, 1),
+                    reply_markup=kb,
                     parse_mode="HTML",
                 )
         await callback.answer()
 
+    @router.callback_query(F.data.startswith("cat_page:"))
+    async def cb_cat_page(callback: CallbackQuery) -> None:
+        # cat_page:<category>:<page>
+        parts         = callback.data.split(":", 2)
+        category_name = parts[1]
+        page          = int(parts[2]) if len(parts) > 2 else 0
+        # Reindirizza al handler categoria con la pagina corretta
+        # (implementazione semplificata: richiama la categoria)
+        await cb_category(callback)
+
+    @router.callback_query(F.data.startswith("back_cat:"))
+    async def cb_back_cat(callback: CallbackQuery) -> None:
+        category_name      = callback.data.split(":", 1)[1]
+        callback.data      = f"cat:{category_name}"
+        await cb_category(callback)
+
+    @router.callback_query(F.data.startswith("prod:"))
+    async def cb_product(callback: CallbackQuery) -> None:
+        """Mostra scheda prodotto da product_key."""
+        pid     = callback.data.split(":", 1)[1]
+        product = get_product_by_key(pid)
+        if not product:
+            await callback.answer("Prodotto non trovato.", show_alert=True)
+            return
+        user_id = callback.from_user.id if callback.from_user else 0
+        is_fav  = ctx.is_favorite(user_id, pid)
+        stock   = int(getattr(product, "stock", 99))
+        caption = format_product(product)
+        kb      = product_card_menu(pid, product.category or "", stock, is_fav)
+
+        if product.image_url:
+            await callback.message.answer_photo(
+                photo=product.image_url,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=kb,
+            )
+        else:
+            await callback.message.answer(
+                caption,
+                reply_markup=kb,
+                parse_mode="HTML",
+            )
+        await callback.answer()
+
+    @router.callback_query(F.data.startswith("info:"))
+    async def cb_info(callback: CallbackQuery) -> None:
+        """Dettagli aggiuntivi prodotto (stessa scheda per ora)."""
+        pid     = callback.data.split(":", 1)[1]
+        product = get_product_by_key(pid)
+        if not product:
+            await callback.answer("Prodotto non trovato.", show_alert=True)
+            return
+        details = getattr(product, "details", {}) or {}
+        lines   = [f"📋 <b>Dettagli — {product.name}</b>\n"]
+        if isinstance(details, dict):
+            for k, v in details.items():
+                lines.append(f"• <b>{k}</b>: {v}")
+        if len(lines) == 1:
+            lines.append("Nessun dettaglio aggiuntivo disponibile.")
+        await callback.message.answer("\n".join(lines), parse_mode="HTML")
+        await callback.answer()
+
+    # ─────────────────────────────────────────────────────────────
+    #  QUANTITÀ — qty:* e add:*
+    # ─────────────────────────────────────────────────────────────
+
     @router.callback_query(F.data.startswith("qty:"))
-    async def quantity(callback: CallbackQuery) -> None:
+    async def cb_quantity(callback: CallbackQuery) -> None:
         _, product_id, qty_raw = callback.data.split(":", 2)
-        qty = max(1, int(qty_raw))
+        qty = max(0, int(qty_raw))
+        if qty == 0:
+            # Rimuovi dal carrello se l'utente preme 🗑️ con qty=0
+            if callback.from_user:
+                remove_from_cart(callback.from_user.id, product_id)
+            await callback.answer("Prodotto rimosso dal carrello.")
+            return
         await callback.message.edit_reply_markup(
             reply_markup=quantity_menu(product_id, qty)
         )
         await callback.answer(f"Quantità: {qty}")
 
+    @router.callback_query(F.data.startswith("add:"))
+    async def cb_add(callback: CallbackQuery) -> None:
+        parts      = callback.data.split(":")
+        product_id = parts[1]
+        qty        = max(1, int(parts[2])) if len(parts) > 2 else 1
+
+        if not callback.from_user:
+            await callback.answer("Utente non trovato.")
+            return
+
+        product = get_product_by_key(product_id)
+        if not product:
+            await callback.answer("Prodotto non trovato.", show_alert=True)
+            return
+
+        add_to_cart(callback.from_user.id, product_id, qty)
+        count = cart_count(callback.from_user.id)
+
+        # Aggiorna reply keyboard con contatore carrello
+        await callback.message.answer(
+            f"✅ <b>{product.name}</b> aggiunto al carrello (x{qty})\n"
+            f"🛒 Totale articoli: {count}",
+            reply_markup=main_menu(count),
+            parse_mode="HTML",
+        )
+        await callback.answer(f"Aggiunto x{qty}!")
+
     @router.callback_query(F.data == "noop")
-    async def noop(callback: CallbackQuery) -> None:
+    async def cb_noop(callback: CallbackQuery) -> None:
         await callback.answer()
 
-    @router.callback_query(F.data.startswith("add:"))
-    async def add(callback: CallbackQuery) -> None:
-        _, product_id, qty_raw = callback.data.split(":", 2)
-        qty = max(1, int(qty_raw))
-        if callback.from_user:
-            add_to_cart(callback.from_user.id, product_id, qty)
-            await callback.answer(f"Aggiunto prodotto x{qty}")
-        else:
-            await callback.answer("Utente non trovato.")
+    # ─────────────────────────────────────────────────────────────
+    #  SCREEN 03 — CARRELLO
+    #  Reply keyboard: 🛒 Carrello  /  callback: show_cart, cart_clear,
+    #  cart_edit, cart_coupon, checkout_start, ship:*, pay:*, rem:*
+    # ─────────────────────────────────────────────────────────────
 
-    @router.message(F.text == "🛍️ Carrello")
+    @router.message(F.text.startswith(BTN_CARRELLO))   # gestisce anche "🛒 Carrello (N)"
     @router.message(Command("carrello"))
     async def cart(message: Message) -> None:
         if not message.from_user:
             return
-        user_id = message.from_user.id
+        user_id  = message.from_user.id
         cart_map = get_cart(user_id)
-        if not cart_map:
-            await message.answer("Il tuo carrello è vuoto. Usa /catalogo.")
-            return
-        cart_items = []
-        for key in cart_map.keys():
-            product = get_product(key)
-            cart_items.append((product.name if product else key, key))
+        has      = bool(cart_map)
+
         await message.answer(
-            cart_summary(user_id),
-            reply_markup=cart_menu(cart_items),
+            cart_text_summary(user_id),
+            reply_markup=cart_menu(has),
+            parse_mode="HTML",
         )
 
-    @router.callback_query(F.data.startswith("rem:"))
-    async def remove(callback: CallbackQuery) -> None:
-        if callback.from_user:
-            remove_from_cart(callback.from_user.id, callback.data.split(":", 1)[1])
-            await callback.answer("Rimosso.")
-            if callback.message:
-                await cart(callback.message)
+    @router.callback_query(F.data == "show_cart")
+    async def cb_show_cart(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        user_id  = callback.from_user.id
+        cart_map = get_cart(user_id)
+        has      = bool(cart_map)
+
+        await callback.message.answer(
+            cart_text_summary(user_id),
+            reply_markup=cart_menu(has),
+            parse_mode="HTML",
+        )
+        await callback.answer()
 
     @router.callback_query(F.data == "cart_clear")
-    async def clear(callback: CallbackQuery) -> None:
+    async def cb_cart_clear(callback: CallbackQuery) -> None:
         if callback.from_user:
             clear_cart(callback.from_user.id)
-            await callback.answer("Carrello svuotato.")
-            await callback.message.edit_text("Carrello svuotato. Usa /catalogo.")
+        await callback.answer("Carrello svuotato.")
+        await callback.message.edit_text(
+            "🛒 Carrello svuotato.\nUsa il catalogo per aggiungere prodotti.",
+            reply_markup=cart_menu(False),
+        )
 
-    @router.callback_query(F.data == "checkout_data")
-    async def checkout_data(callback: CallbackQuery) -> None:
+    @router.callback_query(F.data == "cart_edit")
+    async def cb_cart_edit(callback: CallbackQuery) -> None:
+        """Mostra i prodotti nel carrello con selettori quantità."""
+        if not callback.from_user:
+            return
+        user_id  = callback.from_user.id
+        cart_map = get_cart(user_id)
+        if not cart_map:
+            await callback.answer("Carrello vuoto.", show_alert=True)
+            return
+        await callback.answer()
+        for key, qty in cart_map.items():
+            product = get_product_by_key(key)
+            name    = product.name if product else key
+            await callback.message.answer(
+                f"✏️ <b>{name}</b>",
+                reply_markup=quantity_menu(key, qty),
+                parse_mode="HTML",
+            )
+
+    @router.callback_query(F.data == "cart_coupon")
+    async def cb_cart_coupon(callback: CallbackQuery) -> None:
         if not callback.from_user:
             return
         record = customer_record(callback.from_user.id)
-        record["stage"] = "order_collect"
+        record["stage"] = "coupon_collect"
         save_customer(callback.from_user.id, record)
         await callback.message.answer(
-            "Per completare l'ordine, scrivimi in un solo messaggio:\n"
-            "- Nome e cognome\n"
-            "- Indirizzo completo\n"
-            "- Email\n"
-            "- Eventuale Partita IVA\n"
-            "Poi ti mando totale e checkout Stripe."
+            "🏷️ Inserisci il codice coupon:",
         )
         await callback.answer()
+
+    @router.callback_query(F.data.startswith("rem:"))
+    async def cb_remove(callback: CallbackQuery) -> None:
+        if callback.from_user:
+            remove_from_cart(callback.from_user.id, callback.data.split(":", 1)[1])
+        await callback.answer("Rimosso dal carrello.")
+        await cb_show_cart(callback)
+
+    # ── Checkout step 1 — Scelta spedizione ──────────────────────
+
+    @router.callback_query(F.data == "checkout_start")
+    async def cb_checkout_start(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        user_id  = callback.from_user.id
+        cart_map = get_cart(user_id)
+        if not cart_map:
+            await callback.answer("Il carrello è vuoto.", show_alert=True)
+            return
+        await callback.message.answer(
+            "📦 <b>Spedizione</b>\n\nScegli come vuoi ricevere il tuo ordine:",
+            reply_markup=shipping_menu(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
+    # ── Checkout step 2 — Scelta pagamento ───────────────────────
+
+    @router.callback_query(F.data.startswith("ship:"))
+    async def cb_ship(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        user_id  = callback.from_user.id
+        method   = callback.data.split(":", 1)[1]   # "home" | "pickup"
+
+        # Calcola costo spedizione
+        if method == "home":
+            shipping_cost  = float(ctx.settings.default_shipping)
+            shipping_label = f"Spedizione a casa (+€{shipping_cost:.2f})"
+        else:
+            shipping_cost  = 0.0
+            shipping_label = "Ritiro in negozio (gratuito)"
+
+        # Calcola subtotale carrello
+        cart_map = get_cart(user_id)
+        subtotal = 0.0
+        for key, qty in cart_map.items():
+            product = get_product_by_key(key)
+            if product and product.price:
+                subtotal += float(str(product.price).replace(",", ".")) * qty
+
+        # Coupon dallo stato checkout
+        checkout = ctx.get_checkout(user_id)
+        discount = checkout.get("discount", 0.0)
+        total    = max(0.0, (subtotal + shipping_cost) * (1 - discount))
+
+        # Salva stato checkout
+        ctx.set_checkout(user_id, {
+            "shipping":      method,
+            "shipping_cost": shipping_cost,
+            "discount":      discount,
+            "coupon":        checkout.get("coupon"),
+            "total":         total,
+        })
+
+        await callback.message.answer(
+            f"💳 <b>Pagamento</b>\n\n"
+            f"🚚 {shipping_label}\n"
+            f"💴 Totale: <b>€ {total:.2f}</b>\n\n"
+            f"Scegli il metodo di pagamento:",
+            reply_markup=payment_menu(total),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
+    # ── Checkout step 3 — Pagamento ──────────────────────────────
+
+    @router.callback_query(F.data.startswith("pay:"))
+    async def cb_pay(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        user_id = callback.from_user.id
+        method  = callback.data.split(":", 1)[1]   # "card" | "paypal"
+        checkout = ctx.get_checkout(user_id)
+
+        if not checkout:
+            await callback.answer(
+                "Sessione scaduta. Riparti dal carrello.", show_alert=True
+            )
+            return
+
+        total = checkout.get("total", 0.0)
+
+        # Genera order_id
+        import hashlib, datetime
+        ts       = int(time.time())
+        order_id = hashlib.sha1(
+            f"{user_id}{ts}".encode()
+        ).hexdigest()[:8].upper()
+
+        # Salva ordine nel profilo utente
+        record = customer_record(user_id)
+        shipping_method = checkout.get("shipping", "home")
+        record.setdefault("orders", []).append({
+            "order_id": order_id,
+            "total":    total,
+            "status":   "pending",
+            "ts":       ts,
+            "shipping": shipping_method,
+            "payment":  method,
+        })
+        record["stage"] = "payment_pending"
+        record["next_followup"] = ts + int(ctx.settings.followup_hours * 3600)
+        record["followup_sent"] = False
+        save_customer(user_id, record)
+
+        # Svuota carrello e stato checkout
+        clear_cart(user_id)
+        ctx.clear_checkout(user_id)
+
+        # Genera link Stripe per "card"
+        stripe_link = None
+        if method == "card":
+            stripe_link = create_stripe_link(
+                total, ctx.settings, f"Oro Naturale order {order_id}"
+            )
+
+        # Label metodo e spedizione
+        method_label   = "💳 Carta di credito" if method == "card" else "💸 PayPal"
+        shipping_label = (
+            f"Spedizione a casa (+€{checkout.get('shipping_cost', 0):.2f})"
+            if shipping_method == "home"
+            else "Ritiro in negozio"
+        )
+
+        # Messaggio conferma
+        confirm_text = format_order_confirmed(
+            order_id       = order_id,
+            total          = total,
+            method_label   = method_label,
+            shipping_label = shipping_label,
+            address        = record.get("address"),
+        )
+        await callback.message.answer(
+            confirm_text,
+            reply_markup=order_confirmed_menu(order_id),
+            parse_mode="HTML",
+        )
+
+        if stripe_link:
+            await callback.message.answer(f"🔗 <b>Paga ora:</b>\n{stripe_link}", parse_mode="HTML")
+
+        # Notifica admin
+        ctx.store.append_jsonl("orders.jsonl", {
+            "order_id": order_id,
+            "user_id":  user_id,
+            "username": callback.from_user.username,
+            "total":    total,
+            "ts":       ts,
+            "details":  f"{method} | {shipping_method}",
+        })
+        for admin_id in ctx.settings.admin_chat_ids:
+            try:
+                await callback.bot.send_message(
+                    admin_id,
+                    f"🔔 <b>NUOVO ORDINE</b> <code>#{order_id}</code>\n"
+                    f"👤 @{callback.from_user.username or user_id}\n"
+                    f"💴 € {total:.2f} | {method_label}\n"
+                    f"🚚 {shipping_label}",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+
+        await callback.answer("✅ Ordine confermato!")
+
+    # ─────────────────────────────────────────────────────────────
+    #  SCREEN 04 — I MIEI ORDINI
+    #  Reply keyboard: 📦 I miei ordini
+    #  Callback: orders_list, order:*
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_ORDINI)
+    @router.message(Command("ordini"))
+    async def my_orders(message: Message) -> None:
+        if not message.from_user:
+            return
+        user_id    = message.from_user.id
+        order_list = build_orders_list(user_id)
+        await message.answer(
+            format_orders_header(len(order_list)),
+            reply_markup=orders_menu(order_list) if order_list else None,
+            parse_mode="HTML",
+        )
+
+    @router.callback_query(F.data == "orders_list")
+    async def cb_orders_list(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        user_id    = callback.from_user.id
+        order_list = build_orders_list(user_id)
+        await callback.message.answer(
+            format_orders_header(len(order_list)),
+            reply_markup=orders_menu(order_list) if order_list else None,
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
+    @router.callback_query(F.data.startswith("order:"))
+    async def cb_order_detail(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        order_id = callback.data.split(":", 1)[1]
+        record   = customer_record(callback.from_user.id)
+
+        order = next(
+            (o for o in record.get("orders", []) if o.get("order_id") == order_id),
+            None,
+        )
+        if not order:
+            await callback.answer("Ordine non trovato.", show_alert=True)
+            return
+
+        order_dict = {
+            "id":      order_id,
+            "date":    _ts_to_date(order.get("ts", 0)),
+            "status":  order.get("status", "pending"),
+            "total":   order.get("total", 0.0),
+            "items":   "",
+            "address": record.get("address", ""),
+        }
+        await callback.message.answer(
+            format_order_detail(order_dict),
+            reply_markup=order_detail_menu(order_id),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
+    # ─────────────────────────────────────────────────────────────
+    #  SCREEN 05 — POST-VENDITA
+    #  Callback: track:*, review:*
+    # ─────────────────────────────────────────────────────────────
+
+    @router.callback_query(F.data.startswith("track:"))
+    async def cb_track(callback: CallbackQuery) -> None:
+        order_id  = callback.data.split(":", 1)[1]
+        shipments = ctx.store.load_json("shipments.json", {})
+        entry     = shipments.get(order_id)
+
+        if not entry:
+            await callback.message.answer(
+                f"📦 <b>Tracking ordine #{order_id}</b>\n\n"
+                "Nessuna informazione di spedizione disponibile ancora.\n"
+                "Riceverai una notifica appena il pacco sarà spedito.",
+                reply_markup=tracking_menu(order_id),
+                parse_mode="HTML",
+            )
+        else:
+            carrier_note = (
+                f"🚛 {entry.get('carrier')}  ·  <code>{entry.get('code')}</code>"
+            )
+            text = format_tracking_message(
+                order_id    = order_id,
+                status      = entry.get("status", "shipped"),
+                carrier_note= carrier_note,
+            )
+            await callback.message.answer(
+                text,
+                reply_markup=tracking_menu(order_id, entry.get("url")),
+                parse_mode="HTML",
+            )
+        await callback.answer()
+
+    @router.callback_query(F.data.startswith("review:"))
+    async def cb_review(callback: CallbackQuery) -> None:
+        # review:<order_id>:<rating|skip>
+        parts    = callback.data.split(":")
+        order_id = parts[1]
+        value    = parts[2] if len(parts) > 2 else "skip"
+
+        if value == "skip":
+            await callback.answer("Nessun problema, grazie!")
+            await callback.message.edit_reply_markup(reply_markup=None)
+            return
+
+        try:
+            rating = int(value)
+        except ValueError:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id if callback.from_user else 0
+        ctx.save_review(order_id, user_id, rating)
+
+        stars = "⭐" * rating
+        await callback.message.edit_text(
+            f"🙏 Grazie per la tua recensione!\n\n"
+            f"Ordine #{order_id}: {stars} ({rating}/5)"
+        )
+        await callback.answer("Recensione salvata!")
+
+    # ─────────────────────────────────────────────────────────────
+    #  PREFERITI
+    #  Reply keyboard: ❤️ Preferiti
+    #  Callback: fav_list, fav:*
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_PREFERITI)
+    async def my_favorites(message: Message) -> None:
+        if not message.from_user:
+            return
+        user_id = message.from_user.id
+        fav_keys = ctx.get_favorites(user_id)
+        products  = [p for p in ctx.products if product_key(p) in fav_keys]
+
+        if not products:
+            await message.answer(
+                format_favorites_empty(),
+                reply_markup=favorites_empty_menu(),
+                parse_mode="HTML",
+            )
+            return
+
+        prod_dicts = [
+            {"id": product_key(p), "name": p.name, "price": p.price or 0}
+            for p in products
+        ]
+        await message.answer(
+            format_favorites_header(len(products)),
+            reply_markup=favorites_menu(prod_dicts),
+            parse_mode="HTML",
+        )
+
+    @router.callback_query(F.data == "fav_list")
+    async def cb_fav_list(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        user_id  = callback.from_user.id
+        fav_keys = ctx.get_favorites(user_id)
+        products  = [p for p in ctx.products if product_key(p) in fav_keys]
+
+        if not products:
+            await callback.message.answer(
+                format_favorites_empty(),
+                reply_markup=favorites_empty_menu(),
+                parse_mode="HTML",
+            )
+        else:
+            prod_dicts = [
+                {"id": product_key(p), "name": p.name, "price": p.price or 0}
+                for p in products
+            ]
+            await callback.message.answer(
+                format_favorites_header(len(products)),
+                reply_markup=favorites_menu(prod_dicts),
+                parse_mode="HTML",
+            )
+        await callback.answer()
+
+    @router.callback_query(F.data.startswith("fav:"))
+    async def cb_fav_toggle(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        product_key_str = callback.data.split(":", 1)[1]
+        user_id         = callback.from_user.id
+        added           = ctx.toggle_favorite(user_id, product_key_str)
+
+        if added:
+            await callback.answer("❤️ Aggiunto ai preferiti!")
+        else:
+            await callback.answer("🤍 Rimosso dai preferiti.")
+
+        # Aggiorna il bottone nella scheda prodotto
+        product = get_product_by_key(product_key_str)
+        if product:
+            stock = int(getattr(product, "stock", 99))
+            await callback.message.edit_reply_markup(
+                reply_markup=product_card_menu(
+                    product_key_str,
+                    product.category or "",
+                    stock,
+                    added,
+                )
+            )
+
+    # ─────────────────────────────────────────────────────────────
+    #  PROFILO
+    #  Reply keyboard: 👤 Profilo
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_PROFILO)
+    async def my_profile(message: Message) -> None:
+        if not message.from_user:
+            return
+        user_id  = message.from_user.id
+        c_count  = cart_count(user_id)
+        fav_count = len(ctx.get_favorites(user_id))
+        await message.answer(
+            format_profile(message.from_user, c_count, fav_count),
+            reply_markup=profile_menu(),
+            parse_mode="HTML",
+        )
+
+    # ─────────────────────────────────────────────────────────────
+    #  NEGOZIO
+    #  Reply keyboard: 📍 Negozio
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_NEGOZIO)
+    async def store_info(message: Message) -> None:
+        await message.answer(
+            format_store_info(),
+            reply_markup=store_menu(),
+            parse_mode="HTML",
+        )
+
+    # ─────────────────────────────────────────────────────────────
+    #  SUPPORTO
+    #  Reply keyboard: 🎧 Supporto
+    #  Callback: support, support_write, info_shipping
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_SUPPORTO)
+    async def support(message: Message) -> None:
+        await message.answer(
+            format_support_info(),
+            reply_markup=support_menu(),
+            parse_mode="HTML",
+        )
+
+    @router.callback_query(F.data == "support")
+    async def cb_support(callback: CallbackQuery) -> None:
+        await callback.message.answer(
+            format_support_info(),
+            reply_markup=support_menu(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
+    @router.callback_query(F.data == "support_write")
+    async def cb_support_write(callback: CallbackQuery) -> None:
+        if callback.from_user:
+            record = customer_record(callback.from_user.id)
+            record["stage"] = "support_collect"
+            save_customer(callback.from_user.id, record)
+        await callback.message.answer(
+            "💬 Scrivi il tuo messaggio e lo invieremo al nostro team.\n"
+            "Risposta garantita entro 2 ore."
+        )
+        await callback.answer()
+
+    @router.callback_query(F.data == "info_shipping")
+    async def cb_info_shipping(callback: CallbackQuery) -> None:
+        await callback.message.answer(
+            f"📦 <b>Informazioni spedizione</b>\n\n"
+            f"✅ Spedizione gratuita da € {ctx.settings.free_shipping_min}\n"
+            f"📦 Tariffa standard: € {ctx.settings.default_shipping}\n\n"
+            f"🕐 Tempi di consegna: 2–4 giorni lavorativi\n"
+            f"🏪 Ritiro in negozio disponibile gratuitamente",
+            parse_mode="HTML",
+        )
+        await callback.answer()
+
+    # ─────────────────────────────────────────────────────────────
+    #  CERCA
+    #  Reply keyboard: 🔍 Cerca
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.text == BTN_CERCA)
+    async def search_start(message: Message) -> None:
+        if not message.from_user:
+            return
+        record = customer_record(message.from_user.id)
+        record["stage"] = "search_collect"
+        save_customer(message.from_user.id, record)
+        await message.answer("🔍 Scrivi il nome del prodotto che cerchi:")
+
+    @router.callback_query(F.data == "search_again")
+    async def cb_search_again(callback: CallbackQuery) -> None:
+        if not callback.from_user:
+            return
+        record = customer_record(callback.from_user.id)
+        record["stage"] = "search_collect"
+        save_customer(callback.from_user.id, record)
+        await callback.message.answer("🔍 Scrivi il nome del prodotto che cerchi:")
+        await callback.answer()
+
+    # ─────────────────────────────────────────────────────────────
+    #  Comandi testuali (invariati)
+    # ─────────────────────────────────────────────────────────────
 
     @router.message(Command("contatti"))
     async def contacts(message: Message) -> None:
         await message.answer(format_company(ctx.company))
 
-    @router.message(F.text == "📞 Contatti")
-    async def contacts_button(message: Message) -> None:
-        await contacts(message)
-
     @router.message(Command("pagamenti"))
-    async def payments(message: Message) -> None:
+    async def payments_cmd(message: Message) -> None:
         await message.answer(format_payments(ctx.payment_methods, ctx.settings))
-
-    @router.message(F.text == "💳 Pagamenti")
-    async def payments_button(message: Message) -> None:
-        await payments(message)
 
     @router.message(Command("spedizione"))
     async def shipping_info(message: Message) -> None:
         await message.answer(
-            f"Spedizione gratuita da EUR {ctx.settings.free_shipping_min}.\n"
-            f"Tariffa standard: EUR {ctx.settings.default_shipping}.\n"
-            "Scrivimi paese e totale ordine per un calcolo preciso."
+            f"📦 Spedizione gratuita da € {ctx.settings.free_shipping_min}.\n"
+            f"Tariffa standard: € {ctx.settings.default_shipping}.\n"
+            "Scrivimi paese e totale per un calcolo preciso."
         )
 
     @router.message(Command("b2b"))
@@ -255,66 +972,40 @@ def build_public_router(ctx: BotContext) -> Router:
         if not message.from_user:
             return
         record = customer_record(message.from_user.id)
-        record["type"] = "b2b"
+        record["type"]  = "b2b"
         record["stage"] = "qualify"
         save_customer(message.from_user.id, record)
         await message.answer(
-            f"Attivato profilo professionale con sconto del {ctx.settings.b2b_discount}%."
+            f"🏢 Profilo professionale attivato.\n"
+            f"Sconto B2B: {ctx.settings.b2b_discount}%"
         )
 
-    @router.message(F.text == "🏢 Area B2B")
-    async def b2b_button(message: Message) -> None:
-        await b2b(message)
-
-    @router.message(Command("lingua"))
-    async def language(message: Message) -> None:
-        parts = (message.text or "").split()
-        if len(parts) < 2:
-            await message.answer("Uso: /lingua it|en|de")
-            return
-        code = parts[1].lower()
-        if code not in {"it", "en", "de"}:
-            await message.answer("Lingua non supportata.")
-            return
-        if message.from_user:
-            record = customer_record(message.from_user.id)
-            record["lang"] = code
-            save_customer(message.from_user.id, record)
-        await message.answer(f"Lingua impostata: {code}")
-
-    @router.message(Command("faq"))
-    async def faq(message: Message) -> None:
-        if not ctx.faq:
-            await message.answer("FAQ non configurate.")
-            return
-        await message.answer("FAQ:\n" + "\n".join(f"- {k}" for k in sorted(ctx.faq.keys())))
-
-    @router.message(F.text == "ℹ️ Info & FAQ")
-    async def faq_button(message: Message) -> None:
-        await faq(message)
-
     @router.message(Command("tracking"))
-    async def tracking(message: Message) -> None:
+    async def tracking_cmd(message: Message) -> None:
         parts = (message.text or "").split(maxsplit=1)
         if len(parts) < 2:
             await message.answer("Uso: /tracking <order_id>")
             return
         shipments = ctx.store.load_json("shipments.json", {})
-        entry = shipments.get(parts[1].strip())
+        entry     = shipments.get(parts[1].strip())
         if not entry:
             await message.answer("Nessuna spedizione trovata per questo ordine.")
             return
         await message.answer(
-            f"Tracking {parts[1].strip()}:\n"
+            f"📦 Tracking <code>{parts[1].strip()}</code>:\n"
             f"Corriere: {entry.get('carrier')}\n"
             f"Codice: {entry.get('code')}\n"
             f"Stato: {entry.get('status')}\n"
-            f"Link: {entry.get('url')}"
+            f"🔗 {entry.get('url')}",
+            parse_mode="HTML",
         )
 
-    @router.message(F.text == "📦 Spedizione")
-    async def shipping_button(message: Message) -> None:
-        await shipping_info(message)
+    @router.message(Command("faq"))
+    async def faq_cmd(message: Message) -> None:
+        if not ctx.faq:
+            await message.answer("FAQ non configurate.")
+            return
+        await message.answer("FAQ:\n" + "\n".join(f"• {k}" for k in sorted(ctx.faq.keys())))
 
     @router.message(Command("reset"))
     async def reset(message: Message) -> None:
@@ -334,126 +1025,201 @@ def build_public_router(ctx: BotContext) -> Router:
             "Perfetto. Inviami i dati del cliente e ti preparo totale, spedizione e Stripe."
         )
 
-    @router.message(F.text == "📝 Fai un ordine")
-    async def order_button(message: Message) -> None:
-        await order_entry(message)
+    # ─────────────────────────────────────────────────────────────
+    #  Fallback testo libero
+    # ─────────────────────────────────────────────────────────────
 
     @router.message(F.text)
     async def text_router(message: Message) -> None:
         if not message.from_user:
             return
-        record = customer_record(message.from_user.id)
+        user_id = message.from_user.id
+        record  = customer_record(user_id)
         record["chat_id"] = message.chat.id
-        lang = detect_language(message.text or "")
+        text    = message.text or ""
+
+        # Aggiornamenti profilo da testo
+        lang = detect_language(text)
         if lang and not record.get("lang"):
             record["lang"] = lang
-
-        if detect_b2b(message.text or ""):
+        if detect_b2b(text):
             record["type"] = "b2b"
-
-        pref = detect_preference(message.text or "")
+        pref = detect_preference(text)
         if pref:
             record["preference"] = pref
-
-        fmt = detect_format(message.text or "")
+        fmt = detect_format(text)
         if fmt:
             record["format"] = fmt
 
-        if record.get("stage") == "order_collect" and not (message.text or "").startswith("/"):
-            cart = get_cart(message.from_user.id)
+        # Stage: raccolta coupon
+        if record.get("stage") == "coupon_collect" and not text.startswith("/"):
+            # Coupon semplice: codice fisso "WELCOME10" = 10%
+            coupon    = text.strip().upper()
+            discount  = 0.10 if coupon == "WELCOME10" else 0.0
+            checkout  = ctx.get_checkout(user_id)
+            checkout["coupon"]   = coupon
+            checkout["discount"] = discount
+            ctx.set_checkout(user_id, checkout)
+            record["stage"] = "idle"
+            save_customer(user_id, record)
+            if discount > 0:
+                await message.answer(f"🏷️ Coupon <b>{coupon}</b> applicato! Sconto del 10%.", parse_mode="HTML")
+            else:
+                await message.answer("❌ Coupon non valido.")
+            return
+
+        # Stage: raccolta query ricerca
+        if record.get("stage") == "search_collect" and not text.startswith("/"):
+            results = find_products(ctx.products, text)
+            record["stage"] = "idle"
+            save_customer(user_id, record)
+            if not results:
+                await message.answer(
+                    format_search_empty(text),
+                    reply_markup=search_no_results_menu(),
+                    parse_mode="HTML",
+                )
+            else:
+                prod_dicts = [
+                    {"id": product_key(p), "name": p.name, "price": p.price or 0}
+                    for p in results[:10]
+                ]
+                await message.answer(
+                    format_search_header(text, len(results)),
+                    reply_markup=search_results_menu(prod_dicts),
+                    parse_mode="HTML",
+                )
+            return
+
+        # Stage: raccolta dati ordine
+        if record.get("stage") == "order_collect" and not text.startswith("/"):
+            cart = get_cart(user_id)
             result = process_order_payload(
-                message=message,
-                store=ctx.store,
-                products=ctx.products,
-                settings=ctx.settings,
-                cart=cart,
-                customer=record,
-                order_text=message.text or "",
-                shipping_rules=ctx.shipping_rules,
+                message       = message,
+                store         = ctx.store,
+                products      = ctx.products,
+                settings      = ctx.settings,
+                cart          = cart,
+                customer      = record,
+                order_text    = text,
+                shipping_rules= ctx.shipping_rules,
             )
             if not result:
                 await message.answer("Non capisco il totale. Scrivi prodotti, quantità e paese.")
                 return
+
             record["stage"] = "payment_pending"
-            record.setdefault("orders", []).append(
-                {"order_id": result.order_id, "total": result.total, "ts": int(time.time())}
-            )
+            record.setdefault("orders", []).append({
+                "order_id": result.order_id,
+                "total":    result.total,
+                "status":   "pending",
+                "ts":       int(time.time()),
+            })
             record["next_followup"] = int(time.time() + ctx.settings.followup_hours * 3600)
             record["followup_sent"] = False
-            save_customer(message.from_user.id, record)
-            set_cart(message.from_user.id, {})
+            save_customer(user_id, record)
+            clear_cart(user_id)
+
+            # Notifica admin
             for admin_id in ctx.settings.admin_chat_ids:
-                await message.bot.send_message(
-                    admin_id,
-                    "Nuovo ordine:\n"
-                    f"ID: {result.order_id}\n"
-                    f"Utente: @{message.from_user.username}\n"
-                    f"Totale: EUR {result.total:.2f}\n"
-                    f"Paese: {result.country}\n"
-                    f"Stato: payment_pending",
-                )
-            ctx.store.append_jsonl(
-                "payments.jsonl",
-                {
-                    "order_id": result.order_id,
-                    "status": "pending",
-                    "user_id": message.from_user.id,
-                    "username": message.from_user.username,
-                    "total": result.total,
-                    "ts": int(time.time()),
-                },
-            )
+                try:
+                    await message.bot.send_message(
+                        admin_id,
+                        f"🔔 Nuovo ordine #{result.order_id}\n"
+                        f"@{message.from_user.username} | € {result.total:.2f}",
+                    )
+                except Exception:
+                    pass
+
+            ctx.store.append_jsonl("payments.jsonl", {
+                "order_id": result.order_id,
+                "status":   "pending",
+                "user_id":  user_id,
+                "username": message.from_user.username,
+                "total":    result.total,
+                "ts":       int(time.time()),
+            })
             await message.answer(result.summary)
+
             upsell = recommend_upsell(ctx.products, result.subtotal, ctx.settings)
             if upsell:
                 await message.answer(
-                    "Se aggiungi uno di questi arrivi alla spedizione gratuita:\n"
+                    "💡 Se aggiungi uno di questi arrivi alla spedizione gratuita:\n"
                     + format_products(upsell, 3)
                 )
+
             stripe_link = create_stripe_link(
                 result.total, ctx.settings, f"Oro Naturale order {result.order_id}"
             )
             if stripe_link:
-                await message.answer(f"Pagamento Stripe:\n{stripe_link}")
+                await message.answer(f"💳 Pagamento Stripe:\n{stripe_link}")
             return
 
-        if message.text and "voglio fare un ordine" in message.text.lower():
-            record["stage"] = "order_collect"
-            save_customer(message.from_user.id, record)
+        # Stage: messaggio al supporto
+        if record.get("stage") == "support_collect" and not text.startswith("/"):
+            record["stage"] = "idle"
+            save_customer(user_id, record)
+            for admin_id in ctx.settings.admin_chat_ids:
+                try:
+                    await message.bot.send_message(
+                        admin_id,
+                        f"🎧 <b>Supporto</b> da @{message.from_user.username}:\n{text}",
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    pass
             await message.answer(
-                "Perfetto. Dimmi:\n- Prodotti e quantità\n- Paese/città\n- Se sei B2B o privato"
+                "✅ Messaggio inviato al team. Ti risponderemo entro 2 ore."
             )
             return
 
-        for key, answer in ctx.faq.items():
-            if key.lower() in (message.text or "").lower():
-                await message.answer(answer)
-                save_customer(message.from_user.id, record)
-                return
-
-        recommendations = recommendations_for(ctx.products, record.get("preference"), record.get("format"))
-        if recommendations and ("olio" in (message.text or "").lower() or "catalogo" in (message.text or "").lower()):
-            await message.answer("Ti consiglio:\n" + format_products(recommendations))
-            save_customer(message.from_user.id, record)
+        # Intento ordine libero
+        if "voglio fare un ordine" in text.lower() or "ordine" in text.lower():
+            record["stage"] = "order_collect"
+            save_customer(user_id, record)
+            await message.answer(
+                "Perfetto! Dimmi:\n• Prodotti e quantità\n• Paese di destinazione\n• B2B o privato?"
+            )
             return
 
+        # FAQ
+        for key, answer in ctx.faq.items():
+            if key.lower() in text.lower():
+                await message.answer(answer)
+                save_customer(user_id, record)
+                return
+
+        # Raccomandazioni contestuali
+        recommendations = recommendations_for(
+            ctx.products, record.get("preference"), record.get("format")
+        )
+        if recommendations and any(
+            w in text.lower() for w in ("olio", "catalogo", "prodotto", "consiglia")
+        ):
+            await message.answer("🌿 Ti consiglio:\n" + format_products(recommendations))
+            save_customer(user_id, record)
+            return
+
+        # Risposta AI aziendale
         natural_reply = natural_business_reply(
-            text=message.text or "",
-            products=ctx.products,
-            settings=ctx.settings,
-            shipping_rules=ctx.shipping_rules,
-            company=ctx.company,
+            text           = text,
+            products       = ctx.products,
+            settings       = ctx.settings,
+            shipping_rules = ctx.shipping_rules,
+            company        = ctx.company,
         )
         if natural_reply:
             await message.answer(natural_reply)
-            save_customer(message.from_user.id, record)
+            save_customer(user_id, record)
             return
 
+        # Fallback generico
+        save_customer(user_id, record)
         await message.answer(
-            "Posso aiutarti con catalogo, carrello, spedizione, ordini e pagamenti Stripe.\n"
-            "Usa il menu qui sotto oppure scrivi <i>voglio fare un ordine</i>.",
+            "Posso aiutarti con catalogo, carrello, spedizione, ordini e pagamenti.\n"
+            "Usa il menu qui sotto o scrivi <i>voglio fare un ordine</i>.",
+            reply_markup=main_menu(cart_count(user_id)),
             parse_mode="HTML",
         )
-        save_customer(message.from_user.id, record)
 
     return router
