@@ -21,6 +21,10 @@
 #  │  08 Alert ordine   → admin_new_order_menu()                │
 #  └─────────────────────────────────────────────────────────────┘
 #
+#  CHIAVI CATEGORIA — allineate con catalog.py
+#  extra_virgin_olive_oil | flavored_oils | wines |
+#  cosmetics | gift_boxes | food
+#
 # ═══════════════════════════════════════════════════════════════════
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from aiogram.types import (
 
 # ═══════════════════════════════════════════════════════════════════
 #  COSTANTI CATEGORIE
+#  IMPORTANTE: chiavi identiche a catalog.py CATEGORY_LABELS
 # ═══════════════════════════════════════════════════════════════════
 
 CATEGORY_META: dict[str, dict[str, str]] = {
@@ -42,11 +47,11 @@ CATEGORY_META: dict[str, dict[str, str]] = {
         "emoji": "🌿",
         "label": "Oli Extravergine",
     },
-    "flavored_oil": {
+    "flavored_oils": {           # FIX: era "flavored_oil"
         "emoji": "🧃",
         "label": "Oli Aromatizzati",
     },
-    "wine": {
+    "wines": {                   # FIX: era "wine"
         "emoji": "🍷",
         "label": "Vini",
     },
@@ -54,13 +59,17 @@ CATEGORY_META: dict[str, dict[str, str]] = {
         "emoji": "🧴",
         "label": "Cosmetica",
     },
-    "gift_box": {
+    "gift_boxes": {              # FIX: era "gift_box"
         "emoji": "🎁",
         "label": "Gift Box",
     },
+    "food": {                    # AGGIUNTO: presente in catalog.py
+        "emoji": "🫙",
+        "label": "Gourmet",
+    },
 }
 
-# Emoji stato ordine — usata in testo e admin
+# Emoji + label stato ordine
 ORDER_STATUS_EMOJI: dict[str, str] = {
     "pending":   "⏳ In attesa",
     "confirmed": "✅ Confermato",
@@ -68,6 +77,18 @@ ORDER_STATUS_EMOJI: dict[str, str] = {
     "delivered": "📦 Consegnato",
     "cancelled": "❌ Annullato",
 }
+
+# ── Testi reply keyboard (usati anche come F.text nei router) ──────
+# Definiti come costanti per evitare discrepanze tra keyboards e router
+BTN_CATALOGO   = "🛍️ Catalogo"
+BTN_CERCA      = "🔍 Cerca"
+BTN_CARRELLO   = "🛒 Carrello"
+BTN_ORDINI     = "📦 I miei ordini"
+BTN_PREFERITI  = "❤️ Preferiti"
+BTN_PROFILO    = "👤 Profilo"
+BTN_NEGOZIO    = "📍 Negozio"
+BTN_SUPPORTO   = "🎧 Supporto"
+BTN_MENU       = "🔙 Menu principale"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -91,41 +112,27 @@ def _btn_url(text: str, url: str) -> InlineKeyboardButton:
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 01 — HOME
-#  Reply keyboard persistente + inline welcome
 # ═══════════════════════════════════════════════════════════════════
 
 def main_menu(cart_count: int = 0) -> ReplyKeyboardMarkup:
     """
     Reply keyboard fissa — visibile sempre in basso.
-    Corrisponde ai pulsanti veloci del menu principale (screen 01).
 
     Layout V3:
-        [ 🛍️ Catalogo ]  [ 🔍 Cerca      ]
-        [ 🛒 Carrello  ]  [ 📦 Miei ordini ]
-        [ ❤️ Preferiti ]  [ 👤 Profilo     ]
-        [ 📍 Negozio   ]  [ 🎧 Supporto    ]
+        [ 🛍️ Catalogo ]  [ 🔍 Cerca       ]
+        [ 🛒 Carrello  ]  [ 📦 Miei ordini  ]
+        [ ❤️ Preferiti ]  [ 👤 Profilo      ]
+        [ 📍 Negozio   ]  [ 🎧 Supporto     ]
     """
     cart_label = (
-        f"🛒 Carrello ({cart_count})" if cart_count > 0 else "🛒 Carrello"
+        f"{BTN_CARRELLO} ({cart_count})" if cart_count > 0 else BTN_CARRELLO
     )
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text="🛍️ Catalogo"),
-                KeyboardButton(text="🔍 Cerca"),
-            ],
-            [
-                KeyboardButton(text=cart_label),
-                KeyboardButton(text="📦 I miei ordini"),
-            ],
-            [
-                KeyboardButton(text="❤️ Preferiti"),
-                KeyboardButton(text="👤 Profilo"),
-            ],
-            [
-                KeyboardButton(text="📍 Negozio"),
-                KeyboardButton(text="🎧 Supporto"),
-            ],
+            [KeyboardButton(text=BTN_CATALOGO),  KeyboardButton(text=BTN_CERCA)],
+            [KeyboardButton(text=cart_label),     KeyboardButton(text=BTN_ORDINI)],
+            [KeyboardButton(text=BTN_PREFERITI),  KeyboardButton(text=BTN_PROFILO)],
+            [KeyboardButton(text=BTN_NEGOZIO),    KeyboardButton(text=BTN_SUPPORTO)],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -133,10 +140,7 @@ def main_menu(cart_count: int = 0) -> ReplyKeyboardMarkup:
 
 
 def welcome_menu() -> InlineKeyboardMarkup:
-    """
-    Inline keyboard nel messaggio di benvenuto (screen 01).
-    Bottone principale → catalogo; secondari → ordini e info.
-    """
+    """Inline keyboard nel messaggio di benvenuto (screen 01)."""
     return _ikb(
         [_btn("🛍️ Apri Catalogo Prodotti", "show_categories")],
         [
@@ -153,14 +157,13 @@ def welcome_menu() -> InlineKeyboardMarkup:
 def back_only() -> ReplyKeyboardMarkup:
     """Mini keyboard con solo torna al menu."""
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🔙 Menu principale")]],
+        keyboard=[[KeyboardButton(text=BTN_MENU)]],
         resize_keyboard=True,
     )
 
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 02 — CATALOGO
-#  Categorie → Lista prodotti → Scheda prodotto
 # ═══════════════════════════════════════════════════════════════════
 
 def categories_menu(
@@ -168,7 +171,7 @@ def categories_menu(
 ) -> InlineKeyboardMarkup:
     """
     Griglia categorie 2 colonne (screen 02).
-    Aggiunge riga "In evidenza" se ci sono prodotti featured.
+    Usa le chiavi di CATEGORY_META (allineate con catalog.py).
     """
     rows: list[list[InlineKeyboardButton]] = []
     cats = list(CATEGORY_META.items())
@@ -192,10 +195,7 @@ def product_list_menu(
     page: int = 0,
     per_page: int = 10,
 ) -> InlineKeyboardMarkup:
-    """
-    Lista prodotti con paginazione (screen 02).
-    Una riga per prodotto; nav ◀ ▶ se ci sono più pagine.
-    """
+    """Lista prodotti con paginazione (screen 02)."""
     rows: list[list[InlineKeyboardButton]] = []
 
     start = page * per_page
@@ -212,7 +212,6 @@ def product_list_menu(
         label   = f"{prefix}{name} — €{float(price):.2f}{starred}"
         rows.append([_btn(label, f"prod:{pid}")])
 
-    # Navigazione pagine
     total_pages = max(1, (len(products) + per_page - 1) // per_page)
     nav_row: list[InlineKeyboardButton] = []
     if page > 0:
@@ -246,7 +245,7 @@ def product_card_menu(
     rows: list[list[InlineKeyboardButton]] = []
 
     if stock > 0:
-        rows.append([_btn("🛒 Aggiungi al carrello", f"add:{product_id}")])
+        rows.append([_btn("🛒 Aggiungi al carrello", f"add:{product_id}:1")])
     else:
         rows.append([_btn("⛔ Esaurito", "noop")])
 
@@ -265,36 +264,38 @@ def product_card_menu(
 def quantity_menu(
     product_id: str,
     current_qty: int,
-    max_qty: int,
+    max_qty: int = 99,
 ) -> InlineKeyboardMarkup:
-    """Selettore quantità inline (− qty +)."""
+    """Selettore quantità inline (− qty +) + bottone aggiungi al carrello."""
     qty_row: list[InlineKeyboardButton] = []
 
     if current_qty > 1:
-        qty_row.append(_btn("➖ Meno",  f"qty:{product_id}:{current_qty - 1}"))
+        qty_row.append(_btn("➖", f"qty:{product_id}:{current_qty - 1}"))
     else:
-        qty_row.append(_btn("🗑️ Rimuovi", f"qty:{product_id}:0"))
+        qty_row.append(_btn("🗑️", f"qty:{product_id}:0"))
 
-    piece = "pezzo" if current_qty == 1 else "pezzi"
-    qty_row.append(_btn(f"📏 {current_qty} {piece}", "noop"))
+    piece = "pz" if current_qty == 1 else "pz"
+    qty_row.append(_btn(f"  {current_qty} {piece}  ", "noop"))
 
     if current_qty < max_qty:
-        qty_row.append(_btn("➕ Più", f"qty:{product_id}:{current_qty + 1}"))
+        qty_row.append(_btn("➕", f"qty:{product_id}:{current_qty + 1}"))
     else:
-        qty_row.append(_btn("🚫 Max", "noop"))
+        qty_row.append(_btn("🚫", "noop"))
 
-    return _ikb(qty_row, [_btn("◀ Torna al carrello", "show_cart")])
+    return _ikb(
+        qty_row,
+        [_btn(f"🛒 Aggiungi x{current_qty}", f"add:{product_id}:{current_qty}")],
+        [_btn("◀ Torna al carrello", "show_cart")],
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 03 — CHECKOUT
-#  Carrello → Spedizione → Pagamento → Conferma
 # ═══════════════════════════════════════════════════════════════════
 
 def cart_menu(has_items: bool = True) -> InlineKeyboardMarkup:
     """
     Vista carrello (screen 03).
-
     Se vuoto → solo CTA verso catalogo.
     Se pieno → checkout, modifica, coupon, svuota.
     """
@@ -325,20 +326,20 @@ def shipping_menu() -> InlineKeyboardMarkup:
         [ ◀ Torna al carrello            ]
     """
     return _ikb(
-        [_btn("📦 Spedizione a casa  (+€4,90)",    "ship:home")],
-        [_btn("🏪 Ritiro in negozio (gratuito)",   "ship:pickup")],
-        [_btn("◀ Torna al carrello",               "show_cart")],
+        [_btn("📦 Spedizione a casa  (+€4,90)",  "ship:home")],
+        [_btn("🏪 Ritiro in negozio (gratuito)", "ship:pickup")],
+        [_btn("◀ Torna al carrello",             "show_cart")],
     )
 
 
 def payment_menu(total: float) -> InlineKeyboardMarkup:
     """
     Scelta metodo di pagamento (screen 03).
-    Bonifico rimosso — V3 prevede solo Carta e PayPal.
+    Solo Carta e PayPal — bonifico rimosso in V3.
 
     Layout V3:
-        [ 💳 Paga con Carta ]
-        [ 💸 Paga con PayPal ]
+        [ 💳 Paga con Carta   ]
+        [ 💸 Paga con PayPal  ]
         [ ◀ Modifica spedizione ]
     """
     return _ikb(
@@ -350,7 +351,7 @@ def payment_menu(total: float) -> InlineKeyboardMarkup:
 
 def order_confirmed_menu(order_id: str) -> InlineKeyboardMarkup:
     """
-    Messaggio post-pagamento (screen 03 → transizione screen 04).
+    Messaggio post-pagamento (screen 03 → screen 04).
 
     Layout V3:
         [ 🔗 Traccia spedizione ]
@@ -367,16 +368,10 @@ def order_confirmed_menu(order_id: str) -> InlineKeyboardMarkup:
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 04 — I MIEI ORDINI
-#  Storico + dettaglio singolo ordine
 # ═══════════════════════════════════════════════════════════════════
 
 def orders_menu(order_list: list[dict]) -> InlineKeyboardMarkup:
-    """
-    Lista ordini dell'utente (screen 04).
-
-    Ogni riga mostra: #ID — data — €totale — emoji stato
-    Il testo dello stato proviene da ORDER_STATUS_EMOJI.
-    """
+    """Lista ordini dell'utente (screen 04)."""
     rows: list[list[InlineKeyboardButton]] = []
     for o in order_list:
         status_label = ORDER_STATUS_EMOJI.get(o.get("status", ""), o.get("status", ""))
@@ -408,17 +403,12 @@ def order_detail_menu(order_id: str) -> InlineKeyboardMarkup:
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 05 — POST-VENDITA
-#  Tracking spedizione + richiesta recensione automatica
 # ═══════════════════════════════════════════════════════════════════
 
 def tracking_menu(order_id: str, tracking_url: str | None = None) -> InlineKeyboardMarkup:
     """
-    Schermata tracking (screen 05 — stato "Spedito").
-
+    Schermata tracking (screen 05).
     Se disponibile, aggiunge bottone URL diretto al corriere.
-    Layout V3:
-        [ 🔗 Traccia Pacco ]   ← URL esterno se tracking_url, altrimenti callback
-        [ 🎧 Assistenza ]  [ ◀ Ordini ]
     """
     rows: list[list[InlineKeyboardButton]] = []
 
@@ -436,7 +426,7 @@ def tracking_menu(order_id: str, tracking_url: str | None = None) -> InlineKeybo
 
 def review_menu(order_id: str) -> InlineKeyboardMarkup:
     """
-    Richiesta recensione automatica post-consegna (screen 05).
+    Richiesta recensione post-consegna (screen 05).
 
     Layout V3:
         [ ⭐1 ] [ ⭐2 ] [ ⭐3 ] [ ⭐4 ] [ ⭐5 ]
@@ -456,14 +446,12 @@ def review_menu(order_id: str) -> InlineKeyboardMarkup:
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 06 — ADMIN DASHBOARD
-#  Comando /admin — solo utenti in ADMIN_IDS
 # ═══════════════════════════════════════════════════════════════════
 
 def admin_dashboard_menu(pending_count: int = 0) -> InlineKeyboardMarkup:
     """
     Dashboard admin (screen 06).
 
-    pending_count viene mostrato sul badge "Gestisci Ordini".
     Layout V3:
         [ 📦 Gestisci Ordini (N) ]
         [ ➕ Nuovo Prodotto ]  [ ✏️ Catalogo    ]
@@ -492,11 +480,7 @@ def admin_dashboard_menu(pending_count: int = 0) -> InlineKeyboardMarkup:
 # ═══════════════════════════════════════════════════════════════════
 
 def admin_orders_menu(order_list: list[dict]) -> InlineKeyboardMarkup:
-    """
-    Lista ordini pendenti lato admin (screen 07).
-
-    Ogni riga: #ID · cliente · €totale · stato
-    """
+    """Lista ordini pendenti lato admin (screen 07)."""
     rows: list[list[InlineKeyboardButton]] = []
     for o in order_list:
         status_label = ORDER_STATUS_EMOJI.get(o.get("status", ""), o.get("status", ""))
@@ -531,13 +515,12 @@ def admin_order_actions_menu(order_id: str) -> InlineKeyboardMarkup:
 
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 08 — ADMIN ALERT NUOVO ORDINE
-#  Inviato automaticamente al canale/chat admin ad ogni ordine
 # ═══════════════════════════════════════════════════════════════════
 
 def admin_new_order_menu(order_id: str) -> InlineKeyboardMarkup:
     """
     Alert notifica nuovo ordine (screen 08).
-    Inviato al canale admin privato appena Stripe conferma il pagamento.
+    Inviato al canale admin privato appena il pagamento è confermato.
 
     Layout V3:
         [ 🚚 Segna come SPEDITO ]
@@ -609,9 +592,9 @@ def store_menu() -> InlineKeyboardMarkup:
 
 def support_menu() -> InlineKeyboardMarkup:
     return _ikb(
-        [_btn("💬 Scrivi all'operatore",         "support_write")],
-        [_btn_url("📞 Chiama il negozio",        "tel:+390000000000")],
-        [_btn("🏠 Menu",                         "main_menu")],
+        [_btn("💬 Scrivi all'operatore",   "support_write")],
+        [_btn_url("📞 Chiama il negozio",  "tel:+390000000000")],
+        [_btn("🏠 Menu",                   "main_menu")],
     )
 
 
@@ -703,14 +686,13 @@ def format_cart_summary(
 
     if not cart_items:
         return (
-            "🛒 Il tuo carrello è <b>vuoto</b>.\n\n"
-            "Aggiungi qualcosa dal catalogo!",
+            "🛒 Il tuo carrello è <b>vuoto</b>.\n\nAggiungi qualcosa dal catalogo!",
             0.0,
         )
 
     lines: list[str] = [f"🛒 <b>Il tuo carrello</b>\n{sep}"]
-    subtotal       = 0.0
-    total_pieces   = 0
+    subtotal     = 0.0
+    total_pieces = 0
 
     for item in cart_items:
         pid = item.get("product_id", "")
@@ -725,13 +707,11 @@ def format_cart_summary(
         total_pieces += qty
         lines.append(f"🌿 {name}  x{qty}  →  <b>€ {row_total:.2f}</b>")
 
-    # Spedizione
     if shipping == "home":
         lines.append(f"\n📦 Spedizione a casa:  € {shipping_cost:.2f}")
     elif shipping == "pickup":
         lines.append("\n🏪 Ritiro in negozio:  <b>Gratuito</b>")
 
-    # Coupon
     if coupon and discount > 0:
         disc_amount = subtotal * discount
         disc_pct    = int(discount * 100)
@@ -759,13 +739,13 @@ def format_order_confirmed(
         f"📋 Numero: <code>{order_id}</code>\n"
         f"💴 Totale: <b>€ {total:.2f}</b>\n"
         f"💳 Metodo: {method_label}\n"
-        f"🛢️ Spedizione: {shipping_label}\n"
+        f"🚚 Spedizione: {shipping_label}\n"
     )
     if address:
         text += f"📍 Indirizzo: <b>{address}</b>\n"
     text += (
-        f"\nRiceverai una notifica quando il pacco sarà spedito 📦\n"
-        f"Grazie per aver acquistato da <b>Oro Naturale</b>! 🙏"
+        "\nRiceverai una notifica quando il pacco sarà spedito 📦\n"
+        "Grazie per aver acquistato da <b>Oro Naturale</b>! 🙏"
     )
     return text
 
@@ -782,10 +762,7 @@ def format_orders_header(count: int) -> str:
 
 
 def format_order_detail(order: dict) -> str:
-    """
-    Testo dettaglio ordine utente (screen 04 → screen 05).
-    Mostra stato con emoji, indirizzo, prodotti e tracking note.
-    """
+    """Testo dettaglio ordine utente (screen 04 → screen 05)."""
     order_id = order.get("id", "")
     date     = order.get("date", "")
     status   = order.get("status", "")
@@ -814,10 +791,7 @@ def format_order_detail(order: dict) -> str:
 
 
 def format_tracking_message(order_id: str, status: str, carrier_note: str = "") -> str:
-    """
-    Testo messaggio tracking (screen 05 — stato Spedito).
-    carrier_note: es. "GLS · TN123456789IT"
-    """
+    """Testo messaggio tracking (screen 05)."""
     status_label = ORDER_STATUS_EMOJI.get(status, status)
     text = (
         f"📦 <b>Tracking Ordine #{order_id}</b>\n\n"
@@ -833,7 +807,7 @@ def format_review_request(order_id: str) -> str:
     """Testo richiesta recensione automatica post-consegna (screen 05)."""
     return (
         f"🎉 <b>ORDINE CONSEGNATO!</b>\n\n"
-        f"Il pacco dell'ordine <code>#{order_id}</code> è arrivato a destinazione.\n\n"
+        f"Il pacco dell'ordine <code>#{order_id}</code> è arrivato.\n\n"
         f"Ti andrebbe di valutare il tuo acquisto?\n"
         f"La tua opinione ci aiuta a migliorare 🙏"
     )
@@ -847,10 +821,7 @@ def format_admin_dashboard(
     month_revenue: float,
     avg_rating: float,
 ) -> str:
-    """
-    Testo dashboard admin (screen 06).
-    KPI: ordini da evadere, incasso oggi/mese, prodotti, clienti, rating.
-    """
+    """Testo dashboard admin (screen 06)."""
     return (
         f"📊 <b>DASHBOARD — Oro Naturale</b>\n\n"
         f"📦 Ordini da evadere:  <b>{pending_count}</b>\n"
@@ -871,20 +842,14 @@ def format_admin_new_order(
     total: float,
     gateway: str = "Stripe",
 ) -> str:
-    """
-    Testo notifica nuovo ordine su canale admin (screen 08).
-    Inviato automaticamente al completamento del pagamento.
-    """
+    """Testo notifica nuovo ordine su canale admin (screen 08)."""
     user_ref = f"(@{username})" if username else ""
     return (
         f"🔔 <b>NUOVO ORDINE CONFERMATO</b>\n"
         f"<code>#{order_id}</code>\n\n"
-        f"👤 <b>CLIENTE:</b>\n"
-        f"{customer_name} {user_ref}\n\n"
-        f"📍 <b>DESTINAZIONE:</b>\n"
-        f"{address}\n\n"
-        f"🛍 <b>PRODOTTI:</b>\n"
-        f"{items_text}\n\n"
+        f"👤 <b>CLIENTE:</b>\n{customer_name} {user_ref}\n\n"
+        f"📍 <b>DESTINAZIONE:</b>\n{address}\n\n"
+        f"🛍 <b>PRODOTTI:</b>\n{items_text}\n\n"
         f"💰 <b>TOTALE PAGATO:</b> € {total:.2f}\n"
         f"💳 <b>GATEWAY:</b> {gateway} ✅"
     )
