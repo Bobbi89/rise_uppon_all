@@ -7,6 +7,7 @@ from typing import Any
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
+from aiogram.exceptions import TelegramNetworkError
 
 from ..catalog import (
     category_label,
@@ -78,6 +79,40 @@ from ..services import (
     process_order_payload,
     recommend_upsell,
 )
+
+
+async def safe_send_message(
+    message_or_callback: Message | CallbackQuery,
+    text: str,
+    parse_mode: str = "HTML",
+    reply_markup=None,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+):
+    """
+    Invia un messaggio Telegram con retry automatico in caso di TelegramNetworkError.
+    """
+    for attempt in range(max_retries):
+        try:
+            if isinstance(message_or_callback, Message):
+                return await message_or_callback.answer(
+                    text,
+                    parse_mode=parse_mode,
+                    reply_markup=reply_markup,
+                )
+            else:  # CallbackQuery
+                return await message_or_callback.message.answer(
+                    text,
+                    parse_mode=parse_mode,
+                    reply_markup=reply_markup,
+                )
+        except TelegramNetworkError as e:
+            if attempt == max_retries - 1:
+                raise  # ultimo tentativo, rilancio
+            wait = base_delay * (2 ** attempt)
+            print(f"[safe_send_message] TelegramNetworkError, ritento tra {wait}s...")
+            await asyncio.sleep(wait)
+    return None
 
 
 def build_public_router(ctx: BotContext) -> Router:
@@ -176,15 +211,16 @@ def build_public_router(ctx: BotContext) -> Router:
         else:
             count = 0
 
-        await message.answer(
+        await safe_send_message(
+            message,
             "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
             "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.\n\n"
             "Usa il menu qui sotto per navigare il catalogo, "
             "gestire il carrello e completare i tuoi ordini.",
             reply_markup=main_menu(count),
-            parse_mode="HTML",
         )
-        await message.answer(
+        await safe_send_message(
+            message,
             "Cosa vuoi fare oggi?",
             reply_markup=welcome_menu(),
         )
@@ -199,7 +235,8 @@ def build_public_router(ctx: BotContext) -> Router:
     async def cb_main_menu(callback: CallbackQuery) -> None:
         user_id = callback.from_user.id if callback.from_user else 0
         count   = cart_count(user_id)
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             "🏠 Menu principale",
             reply_markup=main_menu(count),
         )
@@ -214,18 +251,18 @@ def build_public_router(ctx: BotContext) -> Router:
     @router.message(F.text == BTN_CATALOGO)
     @router.message(Command("catalogo"))
     async def catalog(message: Message) -> None:
-        await message.answer(
+        await safe_send_message(
+            message,
             "🛍️ <b>Catalogo Oro Naturale</b>\n\nScegli una categoria:",
             reply_markup=categories_menu(),
-            parse_mode="HTML",
         )
 
     @router.callback_query(F.data == "show_categories")
     async def cb_show_categories(callback: CallbackQuery) -> None:
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             "🛍️ <b>Catalogo Oro Naturale</b>\n\nScegli una categoria:",
             reply_markup=categories_menu(),
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -242,9 +279,9 @@ def build_public_router(ctx: BotContext) -> Router:
             await callback.answer("Nessun prodotto in questa categoria.", show_alert=True)
             return
 
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             f"<b>{category_label(category_name)}</b> — {len(products)} prodotti",
-            parse_mode="HTML",
         )
         for product in products[:10]:
             key     = product_key(product)
@@ -263,10 +300,10 @@ def build_public_router(ctx: BotContext) -> Router:
                     reply_markup=kb,
                 )
             else:
-                await callback.message.answer(
+                await safe_send_message(
+                    callback,
                     caption,
                     reply_markup=kb,
-                    parse_mode="HTML",
                 )
         await callback.answer()
 
@@ -308,10 +345,10 @@ def build_public_router(ctx: BotContext) -> Router:
                 reply_markup=kb,
             )
         else:
-            await callback.message.answer(
+            await safe_send_message(
+                callback,
                 caption,
                 reply_markup=kb,
-                parse_mode="HTML",
             )
         await callback.answer()
 
@@ -330,7 +367,10 @@ def build_public_router(ctx: BotContext) -> Router:
                 lines.append(f"• <b>{k}</b>: {v}")
         if len(lines) == 1:
             lines.append("Nessun dettaglio aggiuntivo disponibile.")
-        await callback.message.answer("\n".join(lines), parse_mode="HTML")
+        await safe_send_message(
+            callback,
+            "\n".join(lines),
+        )
         await callback.answer()
 
     # ─────────────────────────────────────────────────────────────
@@ -371,11 +411,11 @@ def build_public_router(ctx: BotContext) -> Router:
         count = cart_count(callback.from_user.id)
 
         # Aggiorna reply keyboard con contatore carrello
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             f"✅ <b>{product.name}</b> aggiunto al carrello (x{qty})\n"
             f"🛒 Totale articoli: {count}",
             reply_markup=main_menu(count),
-            parse_mode="HTML",
         )
         await callback.answer(f"Aggiunto x{qty}!")
 
@@ -398,10 +438,10 @@ def build_public_router(ctx: BotContext) -> Router:
         cart_map = get_cart(user_id)
         has      = bool(cart_map)
 
-        await message.answer(
+        await safe_send_message(
+            message,
             cart_text_summary(user_id),
             reply_markup=cart_menu(has),
-            parse_mode="HTML",
         )
 
     @router.callback_query(F.data == "show_cart")
@@ -412,10 +452,10 @@ def build_public_router(ctx: BotContext) -> Router:
         cart_map = get_cart(user_id)
         has      = bool(cart_map)
 
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             cart_text_summary(user_id),
             reply_markup=cart_menu(has),
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -443,10 +483,10 @@ def build_public_router(ctx: BotContext) -> Router:
         for key, qty in cart_map.items():
             product = get_product_by_key(key)
             name    = product.name if product else key
-            await callback.message.answer(
+            await safe_send_message(
+                callback,
                 f"✏️ <b>{name}</b>",
                 reply_markup=quantity_menu(key, qty),
-                parse_mode="HTML",
             )
 
     @router.callback_query(F.data == "cart_coupon")
@@ -456,7 +496,8 @@ def build_public_router(ctx: BotContext) -> Router:
         record = customer_record(callback.from_user.id)
         record["stage"] = "coupon_collect"
         save_customer(callback.from_user.id, record)
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             "🏷️ Inserisci il codice coupon:",
         )
         await callback.answer()
@@ -479,10 +520,10 @@ def build_public_router(ctx: BotContext) -> Router:
         if not cart_map:
             await callback.answer("Il carrello è vuoto.", show_alert=True)
             return
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             "📦 <b>Spedizione</b>\n\nScegli come vuoi ricevere il tuo ordine:",
             reply_markup=shipping_menu(),
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -525,13 +566,13 @@ def build_public_router(ctx: BotContext) -> Router:
             "total":         total,
         })
 
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             f"💳 <b>Pagamento</b>\n\n"
             f"🚚 {shipping_label}\n"
             f"💴 Totale: <b>€ {total:.2f}</b>\n\n"
             f"Scegli il metodo di pagamento:",
             reply_markup=payment_menu(total),
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -603,14 +644,17 @@ def build_public_router(ctx: BotContext) -> Router:
             shipping_label = shipping_label,
             address        = record.get("address"),
         )
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             confirm_text,
             reply_markup=order_confirmed_menu(order_id),
-            parse_mode="HTML",
         )
 
         if stripe_link:
-            await callback.message.answer(f"🔗 <b>Paga ora:</b>\n{stripe_link}", parse_mode="HTML")
+            await safe_send_message(
+                callback,
+                f"🔗 <b>Paga ora:</b>\n{stripe_link}",
+            )
 
         # Notifica admin
         ctx.store.append_jsonl("orders.jsonl", {
@@ -649,10 +693,10 @@ def build_public_router(ctx: BotContext) -> Router:
             return
         user_id    = message.from_user.id
         order_list = build_orders_list(user_id)
-        await message.answer(
+        await safe_send_message(
+            message,
             format_orders_header(len(order_list)),
             reply_markup=orders_menu(order_list) if order_list else None,
-            parse_mode="HTML",
         )
 
     @router.callback_query(F.data == "orders_list")
@@ -661,10 +705,10 @@ def build_public_router(ctx: BotContext) -> Router:
             return
         user_id    = callback.from_user.id
         order_list = build_orders_list(user_id)
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             format_orders_header(len(order_list)),
             reply_markup=orders_menu(order_list) if order_list else None,
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -691,10 +735,10 @@ def build_public_router(ctx: BotContext) -> Router:
             "items":   "",
             "address": record.get("address", ""),
         }
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             format_order_detail(order_dict),
             reply_markup=order_detail_menu(order_id),
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -710,12 +754,12 @@ def build_public_router(ctx: BotContext) -> Router:
         entry     = shipments.get(order_id)
 
         if not entry:
-            await callback.message.answer(
+            await safe_send_message(
+                callback,
                 f"📦 <b>Tracking ordine #{order_id}</b>\n\n"
                 "Nessuna informazione di spedizione disponibile ancora.\n"
                 "Riceverai una notifica appena il pacco sarà spedito.",
                 reply_markup=tracking_menu(order_id),
-                parse_mode="HTML",
             )
         else:
             carrier_note = (
@@ -726,10 +770,10 @@ def build_public_router(ctx: BotContext) -> Router:
                 status      = entry.get("status", "shipped"),
                 carrier_note= carrier_note,
             )
-            await callback.message.answer(
+            await safe_send_message(
+                callback,
                 text,
                 reply_markup=tracking_menu(order_id, entry.get("url")),
-                parse_mode="HTML",
             )
         await callback.answer()
 
@@ -776,10 +820,10 @@ def build_public_router(ctx: BotContext) -> Router:
         products  = [p for p in ctx.products if product_key(p) in fav_keys]
 
         if not products:
-            await message.answer(
+            await safe_send_message(
+                message,
                 format_favorites_empty(),
                 reply_markup=favorites_empty_menu(),
-                parse_mode="HTML",
             )
             return
 
@@ -787,10 +831,10 @@ def build_public_router(ctx: BotContext) -> Router:
             {"id": product_key(p), "name": p.name, "price": p.price or 0}
             for p in products
         ]
-        await message.answer(
+        await safe_send_message(
+            message,
             format_favorites_header(len(products)),
             reply_markup=favorites_menu(prod_dicts),
-            parse_mode="HTML",
         )
 
     @router.callback_query(F.data == "fav_list")
@@ -802,20 +846,20 @@ def build_public_router(ctx: BotContext) -> Router:
         products  = [p for p in ctx.products if product_key(p) in fav_keys]
 
         if not products:
-            await callback.message.answer(
+            await safe_send_message(
+                callback,
                 format_favorites_empty(),
                 reply_markup=favorites_empty_menu(),
-                parse_mode="HTML",
             )
         else:
             prod_dicts = [
                 {"id": product_key(p), "name": p.name, "price": p.price or 0}
                 for p in products
             ]
-            await callback.message.answer(
+            await safe_send_message(
+                callback,
                 format_favorites_header(len(products)),
                 reply_markup=favorites_menu(prod_dicts),
-                parse_mode="HTML",
             )
         await callback.answer()
 
@@ -857,10 +901,10 @@ def build_public_router(ctx: BotContext) -> Router:
         user_id  = message.from_user.id
         c_count  = cart_count(user_id)
         fav_count = len(ctx.get_favorites(user_id))
-        await message.answer(
+        await safe_send_message(
+            message,
             format_profile(message.from_user, c_count, fav_count),
             reply_markup=profile_menu(),
-            parse_mode="HTML",
         )
 
     # ─────────────────────────────────────────────────────────────
@@ -870,10 +914,10 @@ def build_public_router(ctx: BotContext) -> Router:
 
     @router.message(F.text == BTN_NEGOZIO)
     async def store_info(message: Message) -> None:
-        await message.answer(
+        await safe_send_message(
+            message,
             format_store_info(),
             reply_markup=store_menu(),
-            parse_mode="HTML",
         )
 
     # ─────────────────────────────────────────────────────────────
@@ -884,18 +928,18 @@ def build_public_router(ctx: BotContext) -> Router:
 
     @router.message(F.text == BTN_SUPPORTO)
     async def support(message: Message) -> None:
-        await message.answer(
+        await safe_send_message(
+            message,
             format_support_info(),
             reply_markup=support_menu(),
-            parse_mode="HTML",
         )
 
     @router.callback_query(F.data == "support")
     async def cb_support(callback: CallbackQuery) -> None:
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             format_support_info(),
             reply_markup=support_menu(),
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -905,7 +949,8 @@ def build_public_router(ctx: BotContext) -> Router:
             record = customer_record(callback.from_user.id)
             record["stage"] = "support_collect"
             save_customer(callback.from_user.id, record)
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             "💬 Scrivi il tuo messaggio e lo invieremo al nostro team.\n"
             "Risposta garantita entro 2 ore."
         )
@@ -913,13 +958,13 @@ def build_public_router(ctx: BotContext) -> Router:
 
     @router.callback_query(F.data == "info_shipping")
     async def cb_info_shipping(callback: CallbackQuery) -> None:
-        await callback.message.answer(
+        await safe_send_message(
+            callback,
             f"📦 <b>Informazioni spedizione</b>\n\n"
             f"✅ Spedizione gratuita da € {ctx.settings.free_shipping_min}\n"
             f"📦 Tariffa standard: € {ctx.settings.default_shipping}\n\n"
             f"🕐 Tempi di consegna: 2–4 giorni lavorativi\n"
             f"🏪 Ritiro in negozio disponibile gratuitamente",
-            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -935,7 +980,10 @@ def build_public_router(ctx: BotContext) -> Router:
         record = customer_record(message.from_user.id)
         record["stage"] = "search_collect"
         save_customer(message.from_user.id, record)
-        await message.answer("🔍 Scrivi il nome del prodotto che cerchi:")
+        await safe_send_message(
+            message,
+            "🔍 Scrivi il nome del prodotto che cerchi:"
+        )
 
     @router.callback_query(F.data == "search_again")
     async def cb_search_again(callback: CallbackQuery) -> None:
@@ -944,7 +992,10 @@ def build_public_router(ctx: BotContext) -> Router:
         record = customer_record(callback.from_user.id)
         record["stage"] = "search_collect"
         save_customer(callback.from_user.id, record)
-        await callback.message.answer("🔍 Scrivi il nome del prodotto che cerchi:")
+        await safe_send_message(
+            callback,
+            "🔍 Scrivi il nome del prodotto che cerchi:"
+        )
         await callback.answer()
 
     # ─────────────────────────────────────────────────────────────
@@ -953,15 +1004,22 @@ def build_public_router(ctx: BotContext) -> Router:
 
     @router.message(Command("contatti"))
     async def contacts(message: Message) -> None:
-        await message.answer(format_company(ctx.company))
+        await safe_send_message(
+            message,
+            format_company(ctx.company)
+        )
 
     @router.message(Command("pagamenti"))
     async def payments_cmd(message: Message) -> None:
-        await message.answer(format_payments(ctx.payment_methods, ctx.settings))
+        await safe_send_message(
+            message,
+            format_payments(ctx.payment_methods, ctx.settings)
+        )
 
     @router.message(Command("spedizione"))
     async def shipping_info(message: Message) -> None:
-        await message.answer(
+        await safe_send_message(
+            message,
             f"📦 Spedizione gratuita da € {ctx.settings.free_shipping_min}.\n"
             f"Tariffa standard: € {ctx.settings.default_shipping}.\n"
             "Scrivimi paese e totale per un calcolo preciso."
@@ -975,7 +1033,8 @@ def build_public_router(ctx: BotContext) -> Router:
         record["type"]  = "b2b"
         record["stage"] = "qualify"
         save_customer(message.from_user.id, record)
-        await message.answer(
+        await safe_send_message(
+            message,
             f"🏢 Profilo professionale attivato.\n"
             f"Sconto B2B: {ctx.settings.b2b_discount}%"
         )
@@ -984,28 +1043,40 @@ def build_public_router(ctx: BotContext) -> Router:
     async def tracking_cmd(message: Message) -> None:
         parts = (message.text or "").split(maxsplit=1)
         if len(parts) < 2:
-            await message.answer("Uso: /tracking <order_id>")
+            await safe_send_message(
+                message,
+                "Uso: /tracking <order_id>"
+            )
             return
         shipments = ctx.store.load_json("shipments.json", {})
         entry     = shipments.get(parts[1].strip())
         if not entry:
-            await message.answer("Nessuna spedizione trovata per questo ordine.")
+            await safe_send_message(
+                message,
+                "Nessuna spedizione trovata per questo ordine."
+            )
             return
-        await message.answer(
+        await safe_send_message(
+            message,
             f"📦 Tracking <code>{parts[1].strip()}</code>:\n"
             f"Corriere: {entry.get('carrier')}\n"
             f"Codice: {entry.get('code')}\n"
             f"Stato: {entry.get('status')}\n"
             f"🔗 {entry.get('url')}",
-            parse_mode="HTML",
         )
 
     @router.message(Command("faq"))
     async def faq_cmd(message: Message) -> None:
         if not ctx.faq:
-            await message.answer("FAQ non configurate.")
+            await safe_send_message(
+                message,
+                "FAQ non configurate."
+            )
             return
-        await message.answer("FAQ:\n" + "\n".join(f"• {k}" for k in sorted(ctx.faq.keys())))
+        await safe_send_message(
+            message,
+            "FAQ:\n" + "\n".join(f"• {k}" for k in sorted(ctx.faq.keys()))
+        )
 
     @router.message(Command("reset"))
     async def reset(message: Message) -> None:
@@ -1013,7 +1084,10 @@ def build_public_router(ctx: BotContext) -> Router:
             record = customer_record(message.from_user.id)
             record.update({"stage": "idle", "followup_sent": False})
             save_customer(message.from_user.id, record)
-        await message.answer("Ripartiamo da zero. Dimmi cosa ti serve.")
+        await safe_send_message(
+            message,
+            "Ripartiamo da zero. Dimmi cosa ti serve."
+        )
 
     @router.message(Command("ordine"))
     async def order_entry(message: Message) -> None:
@@ -1021,7 +1095,8 @@ def build_public_router(ctx: BotContext) -> Router:
             record = customer_record(message.from_user.id)
             record["stage"] = "order_collect"
             save_customer(message.from_user.id, record)
-        await message.answer(
+        await safe_send_message(
+            message,
             "Perfetto. Inviami i dati del cliente e ti preparo totale, spedizione e Stripe."
         )
 
@@ -1063,9 +1138,15 @@ def build_public_router(ctx: BotContext) -> Router:
             record["stage"] = "idle"
             save_customer(user_id, record)
             if discount > 0:
-                await message.answer(f"🏷️ Coupon <b>{coupon}</b> applicato! Sconto del 10%.", parse_mode="HTML")
+                await safe_send_message(
+                    message,
+                    f"🏷️ Coupon <b>{coupon}</b> applicato! Sconto del 10%.",
+                )
             else:
-                await message.answer("❌ Coupon non valido.")
+                await safe_send_message(
+                    message,
+                    "❌ Coupon non valido."
+                )
             return
 
         # Stage: raccolta query ricerca
@@ -1074,20 +1155,20 @@ def build_public_router(ctx: BotContext) -> Router:
             record["stage"] = "idle"
             save_customer(user_id, record)
             if not results:
-                await message.answer(
+                await safe_send_message(
+                    message,
                     format_search_empty(text),
                     reply_markup=search_no_results_menu(),
-                    parse_mode="HTML",
                 )
             else:
                 prod_dicts = [
                     {"id": product_key(p), "name": p.name, "price": p.price or 0}
                     for p in results[:10]
                 ]
-                await message.answer(
+                await safe_send_message(
+                    message,
                     format_search_header(text, len(results)),
                     reply_markup=search_results_menu(prod_dicts),
-                    parse_mode="HTML",
                 )
             return
 
@@ -1105,7 +1186,10 @@ def build_public_router(ctx: BotContext) -> Router:
                 shipping_rules= ctx.shipping_rules,
             )
             if not result:
-                await message.answer("Non capisco il totale. Scrivi prodotti, quantità e paese.")
+                await safe_send_message(
+                    message,
+                    "Non capisco il totale. Scrivi prodotti, quantità e paese."
+                )
                 return
 
             record["stage"] = "payment_pending"
@@ -1139,11 +1223,15 @@ def build_public_router(ctx: BotContext) -> Router:
                 "total":    result.total,
                 "ts":       int(time.time()),
             })
-            await message.answer(result.summary)
+            await safe_send_message(
+                message,
+                result.summary
+            )
 
             upsell = recommend_upsell(ctx.products, result.subtotal, ctx.settings)
             if upsell:
-                await message.answer(
+                await safe_send_message(
+                    message,
                     "💡 Se aggiungi uno di questi arrivi alla spedizione gratuita:\n"
                     + format_products(upsell, 3)
                 )
@@ -1152,7 +1240,10 @@ def build_public_router(ctx: BotContext) -> Router:
                 result.total, ctx.settings, f"Oro Naturale order {result.order_id}"
             )
             if stripe_link:
-                await message.answer(f"💳 Pagamento Stripe:\n{stripe_link}")
+                await safe_send_message(
+                    message,
+                    f"💳 Pagamento Stripe:\n{stripe_link}"
+                )
             return
 
         # Stage: messaggio al supporto
@@ -1168,7 +1259,8 @@ def build_public_router(ctx: BotContext) -> Router:
                     )
                 except Exception:
                     pass
-            await message.answer(
+            await safe_send_message(
+                message,
                 "✅ Messaggio inviato al team. Ti risponderemo entro 2 ore."
             )
             return
@@ -1177,7 +1269,8 @@ def build_public_router(ctx: BotContext) -> Router:
         if "voglio fare un ordine" in text.lower() or "ordine" in text.lower():
             record["stage"] = "order_collect"
             save_customer(user_id, record)
-            await message.answer(
+            await safe_send_message(
+                message,
                 "Perfetto! Dimmi:\n• Prodotti e quantità\n• Paese di destinazione\n• B2B o privato?"
             )
             return
@@ -1185,7 +1278,10 @@ def build_public_router(ctx: BotContext) -> Router:
         # FAQ
         for key, answer in ctx.faq.items():
             if key.lower() in text.lower():
-                await message.answer(answer)
+                await safe_send_message(
+                    message,
+                    answer
+                )
                 save_customer(user_id, record)
                 return
 
@@ -1196,7 +1292,10 @@ def build_public_router(ctx: BotContext) -> Router:
         if recommendations and any(
             w in text.lower() for w in ("olio", "catalogo", "prodotto", "consiglia")
         ):
-            await message.answer("🌿 Ti consiglio:\n" + format_products(recommendations))
+            await safe_send_message(
+                message,
+                "🌿 Ti consiglio:\n" + format_products(recommendations)
+            )
             save_customer(user_id, record)
             return
 
@@ -1209,17 +1308,20 @@ def build_public_router(ctx: BotContext) -> Router:
             company        = ctx.company,
         )
         if natural_reply:
-            await message.answer(natural_reply)
+            await safe_send_message(
+                message,
+                natural_reply
+            )
             save_customer(user_id, record)
             return
 
         # Fallback generico
         save_customer(user_id, record)
-        await message.answer(
+        await safe_send_message(
+            message,
             "Posso aiutarti con catalogo, carrello, spedizione, ordini e pagamenti.\n"
             "Usa il menu qui sotto o scrivi <i>voglio fare un ordine</i>.",
             reply_markup=main_menu(cart_count(user_id)),
-            parse_mode="HTML",
         )
 
     return router
