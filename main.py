@@ -19,6 +19,81 @@ from oro_naturale.storage import FileStore, load_products_from_db
 
 
 # ==========================================
+# MIGRAZIONE prodotti da JSON a PostgreSQL
+# ==========================================
+def migrate_products():
+    """
+    Esegue la migrazione dei prodotti da products.json al database PostgreSQL.
+    Viene chiamata all'avvio del bot.
+    """
+    try:
+        DATABASE_URL = os.environ["DATABASE_URL"]
+        JSON_PATH = "data/products.json"
+
+        if not os.path.exists(JSON_PATH):
+            print("❌ products.json non trovato. Migrazione saltata.")
+            return
+
+        import json
+        with open(JSON_PATH, "r", encoding="utf-8") as f:
+            products = json.load(f)
+
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+
+        for p in products:
+            # Converte stringhe in tipi corretti
+            price = float(p.get("price", "0"))
+            stock = int(p.get("stock", "0"))
+            featured = p.get("featured", "false").lower() == "true"
+            is_sample = p.get("is_sample", "false").lower() == "true"
+
+            cur.execute("""
+                INSERT INTO products (
+                    id, name, description, price, image_url, category,
+                    stock, featured, is_sample, details, translations,
+                    created_date, updated_date, created_by_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    price = EXCLUDED.price,
+                    image_url = EXCLUDED.image_url,
+                    category = EXCLUDED.category,
+                    stock = EXCLUDED.stock,
+                    featured = EXCLUDED.featured,
+                    is_sample = EXCLUDED.is_sample,
+                    details = EXCLUDED.details,
+                    translations = EXCLUDED.translations,
+                    created_date = EXCLUDED.created_date,
+                    updated_date = EXCLUDED.updated_date,
+                    created_by_id = EXCLUDED.created_by_id
+            """, (
+                p.get("id"),
+                p.get("name"),
+                p.get("description"),
+                price,
+                p.get("image_url"),
+                p.get("category"),
+                stock,
+                featured,
+                is_sample,
+                p.get("details"),
+                p.get("translations"),
+                p.get("created_date"),
+                p.get("updated_date"),
+                p.get("created_by_id"),
+            ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("✅ Migrazione prodotti completata.")
+    except Exception as e:
+        print(f"❌ Errore durante la migrazione prodotti: {e}")
+
+
+# ==========================================
 # INIZIALIZZAZIONE DATABASE (Esegue subito all'avvio)
 # ==========================================
 print("Avvio: Controllo della tabella products nel database...")
@@ -80,32 +155,35 @@ class RetryTelegramMiddleware:
 
 
 async def main() -> None:
+    # 1. Migrazione prodotti da JSON a DB
+    print("🔄 Avvio migrazione prodotti da JSON a PostgreSQL...")
+    migrate_products()
+
+    # 2. Caricamento impostazioni e contesto
     settings = load_settings()
     store = FileStore(settings.data_dir)
     ctx = BotContext(settings=settings, store=store)
     ctx.refresh_from_store()
-    # Ora carica i prodotti dal DB PostgreSQL
-    ctx.reload_products(load_products_from_db() + ctx.custom_products)
 
-    # Usa DefaultBotProperties per gestire timeout e sessioni
+    # 3. Carica prodotti dal DB PostgreSQL
+    db_products = load_products_from_db()
+    ctx.reload_products(db_products + ctx.custom_products)
+    print(f"📦 Caricati {len(db_products)} prodotti dal database.")
+
+    # 4. Inizializzazione bot e dispatcher
     bot = Bot(
         token=settings.telegram_bot_token,
-        default=DefaultBotProperties(
-            parse_mode="HTML",
-            # timeout ragionevoli per Railway
-            read_timeout=30.0,
-            write_timeout=30.0,
-            connect_timeout=10.0,
-        )
+        default=DefaultBotProperties(parse_mode="HTML")
     )
     dp = Dispatcher()
 
-    # Aggiungi middleware di retry
+    # Middleware di retry per gestire disconnessioni Telegram
     dp.update.middleware(RetryTelegramMiddleware(max_retries=3, base_delay=1.0))
 
     dp.include_router(build_public_router(ctx))
     dp.include_router(build_admin_router(ctx))
 
+    # Worker per followup e notifiche
     asyncio.create_task(followup_worker(bot, store, settings))
 
     # Gestione pulita dei segnali di shutdown
@@ -126,6 +204,8 @@ async def main() -> None:
         # Windows non supporta add_signal_handler
         pass
 
+    # 5. Avvio polling
+    print("🤖 Bot avviato. In ascolto su Telegram...")
     await dp.start_polling(bot)
 
 
