@@ -28,7 +28,7 @@ def migrate_products():
     """
     try:
         DATABASE_URL = os.environ["DATABASE_URL"]
-        JSON_PATH = "data/products.json"
+        JSON_PATH = "products.json"
 
         if not os.path.exists(JSON_PATH):
             print("❌ products.json non trovato. Migrazione saltata.")
