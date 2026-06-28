@@ -4,6 +4,7 @@ import os
 import psycopg2
 import asyncio
 import signal
+import json
 
 from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramNetworkError
@@ -16,81 +17,6 @@ from oro_naturale.routers.admin import build_admin_router
 from oro_naturale.routers.public import build_public_router
 from oro_naturale.services import followup_worker
 from oro_naturale.storage import FileStore, load_products_from_db
-
-
-# ==========================================
-# MIGRAZIONE prodotti da JSON a PostgreSQL
-# ==========================================
-def migrate_products():
-    """
-    Esegue la migrazione dei prodotti da products.json al database PostgreSQL.
-    Viene chiamata all'avvio del bot.
-    """
-    try:
-        DATABASE_URL = os.environ["DATABASE_URL"]
-        JSON_PATH = "products.json"
-
-        if not os.path.exists(JSON_PATH):
-            print("❌ products.json non trovato. Migrazione saltata.")
-            return
-
-        import json
-        with open(JSON_PATH, "r", encoding="utf-8") as f:
-            products = json.load(f)
-
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-
-        for p in products:
-            # Converte stringhe in tipi corretti
-            price = float(p.get("price", "0"))
-            stock = int(p.get("stock", "0"))
-            featured = p.get("featured", "false").lower() == "true"
-            is_sample = p.get("is_sample", "false").lower() == "true"
-
-            cur.execute("""
-                INSERT INTO products (
-                    id, name, description, price, image_url, category,
-                    stock, featured, is_sample, details, translations,
-                    created_date, updated_date, created_by_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    description = EXCLUDED.description,
-                    price = EXCLUDED.price,
-                    image_url = EXCLUDED.image_url,
-                    category = EXCLUDED.category,
-                    stock = EXCLUDED.stock,
-                    featured = EXCLUDED.featured,
-                    is_sample = EXCLUDED.is_sample,
-                    details = EXCLUDED.details,
-                    translations = EXCLUDED.translations,
-                    created_date = EXCLUDED.created_date,
-                    updated_date = EXCLUDED.updated_date,
-                    created_by_id = EXCLUDED.created_by_id
-            """, (
-                p.get("id"),
-                p.get("name"),
-                p.get("description"),
-                price,
-                p.get("image_url"),
-                p.get("category"),
-                stock,
-                featured,
-                is_sample,
-                p.get("details"),
-                p.get("translations"),
-                p.get("created_date"),
-                p.get("updated_date"),
-                p.get("created_by_id"),
-            ))
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("✅ Migrazione prodotti completata.")
-    except Exception as e:
-        print(f"❌ Errore durante la migrazione prodotti: {e}")
 
 
 # ==========================================
@@ -131,6 +57,87 @@ except Exception as e:
 # ==========================================
 
 
+# ==========================================
+# MIGRAZIONE prodotti da JSON a PostgreSQL
+# ==========================================
+def migrate_products():
+    """
+    Esegue la migrazione dei prodotti da products.json al database PostgreSQL.
+    Viene chiamata all'avvio del bot.
+    """
+    try:
+        DATABASE_URL = os.environ["DATABASE_URL"]
+        JSON_PATH = "products.json"
+
+        if not os.path.exists(JSON_PATH):
+            print("❌ products.json non trovato. Migrazione saltata.")
+            return
+
+        with open(JSON_PATH, "r", encoding="utf-8") as f:
+            products = json.load(f)
+
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+
+        for p in products:
+            # Usa name_it come name se presente, altrimenti usa una stringa vuota
+            name = p.get("name_it") or ""
+            description = p.get("description_it") or ""
+
+            # Converte stringhe in tipi corretti
+            price = float(p.get("price", "0"))
+            stock = int(p.get("stock", "0"))
+            featured = p.get("featured", "false").lower() == "true"
+            is_sample = p.get("is_sample", "false").lower() == "true"
+
+            cur.execute("""
+                INSERT INTO products (
+                    id, name, description, price, image_url, category,
+                    stock, featured, is_sample, details, translations,
+                    created_date, updated_date, created_by_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    price = EXCLUDED.price,
+                    image_url = EXCLUDED.image_url,
+                    category = EXCLUDED.category,
+                    stock = EXCLUDED.stock,
+                    featured = EXCLUDED.featured,
+                    is_sample = EXCLUDED.is_sample,
+                    details = EXCLUDED.details,
+                    translations = EXCLUDED.translations,
+                    created_date = EXCLUDED.created_date,
+                    updated_date = EXCLUDED.updated_date,
+                    created_by_id = EXCLUDED.created_by_id
+            """, (
+                p.get("id"),
+                name,
+                description,
+                price,
+                p.get("image_url"),
+                p.get("category"),
+                stock,
+                featured,
+                is_sample,
+                p.get("attributes"),
+                None,
+                None,
+                None,
+                None,
+            ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("✅ Migrazione prodotti completata.")
+    except Exception as e:
+        print(f"❌ Errore durante la migrazione prodotti: {e}")
+
+
+# ==========================================
+# MIDDLEWARE DI RETRY PER TELEGRAM NETWORK ERRORS
+# ==========================================
 class RetryTelegramMiddleware:
     """
     Middleware che ritenta automaticamente le chiamate Telegram
@@ -154,6 +161,9 @@ class RetryTelegramMiddleware:
         return None  # non dovrebbe mai arrivare qui
 
 
+# ==========================================
+# FUNZIONE PRINCIPALE
+# ==========================================
 async def main() -> None:
     # 1. Migrazione prodotti da JSON a DB
     print("🔄 Avvio migrazione prodotti da JSON a PostgreSQL...")
