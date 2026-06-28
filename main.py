@@ -90,6 +90,10 @@ def migrate_products():
             featured = p.get("featured", "false").lower() == "true"
             is_sample = p.get("is_sample", "false").lower() == "true"
 
+            # Converti attributes in JSON string
+            attributes = p.get("attributes")
+            details_json = json.dumps(attributes) if attributes else None
+
             cur.execute("""
                 INSERT INTO products (
                     id, name, description, price, image_url, category,
@@ -120,7 +124,7 @@ def migrate_products():
                 stock,
                 featured,
                 is_sample,
-                p.get("attributes"),
+                details_json,
                 None,
                 None,
                 None,
@@ -165,6 +169,9 @@ class RetryTelegramMiddleware:
 # FUNZIONE PRINCIPALE
 # ==========================================
 async def main() -> None:
+    # Piccolo delay per evitare conflitti con altre istanze
+    await asyncio.sleep(2)
+
     # 1. Migrazione prodotti da JSON a DB
     print("🔄 Avvio migrazione prodotti da JSON a PostgreSQL...")
     migrate_products()
