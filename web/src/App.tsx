@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { CartSidebar } from "./components/CartSidebar";
 import { CategoryTabs } from "./components/CategoryTabs";
@@ -22,6 +22,39 @@ function scrollToSection(id: string) {
   if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+// Tipi per Telegram Web App SDK
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: {
+        expand(): void;
+        enableClosingConfirmation(): void;
+        MainButton: {
+          show(): void;
+          hide(): void;
+          setText(text: string): void;
+          onClick(callback: () => void): void;
+          offClick(callback: () => void): void;
+        };
+        showPopup(params: {
+          title: string;
+          message: string;
+          buttons: Array<{ type: string; text: string; id: string }>;
+        }, callback: (btnId: string) => void): void;
+        showAlert(message: string): void;
+        initDataUnsafe?: {
+          user?: {
+            id: number;
+            first_name?: string;
+            last_name?: string;
+            username?: string;
+          };
+        };
+      };
+    };
+  }
+}
+
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<CategoryId>("extra_virgin_olive_oil");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -42,6 +75,38 @@ export default function App() {
     if (!selectedProduct) return [];
     return products.filter((product) => product.category === selectedProduct.category && product.id !== selectedProduct.id);
   }, [selectedProduct]);
+
+  // Inizializza Telegram Web App
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+
+    tg.expand(); // schermo intero
+    tg.enableClosingConfirmation(); // opzionale: chiedi conferma uscita
+  }, []);
+
+  // Gestione Telegram MainButton per checkout
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+
+    const totalItems = cartCount;
+    if (totalItems === 0) {
+      tg.MainButton.hide();
+      return;
+    }
+
+    tg.MainButton.setText(`Checkout (${totalItems})`).show();
+    tg.MainButton.onClick(() => {
+      setCartOpen(false);
+      scrollToSection("checkout");
+    });
+
+    // Pulizia evento al unmount
+    return () => {
+      tg.MainButton.offClick(() => {});
+    };
+  }, [cartCount]);
 
   function addToCart(product: Product, quantity = 1) {
     setCart((current) => {
