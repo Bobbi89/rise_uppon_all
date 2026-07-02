@@ -34,6 +34,9 @@ class Settings:
     # Automazioni
     followup_hours: float     # Ore dopo le quale inviare un messaggio di follow-up
 
+    # Mini App Telegram (webapp del marketplace)
+    webapp_url: str           # URL HTTPS della mini app; vuoto = pulsante nascosto
+
 
 def _parse_admin_ids(value: str) -> set[int]:
     """Converte una stringa di ID separati da virgola in un set di interi."""
@@ -71,4 +74,7 @@ def load_settings() -> Settings:
         
         # Follow-up ordini (es. 24h dopo l'acquisto per recensione/assistenza)
         followup_hours=float(os.getenv("FOLLOWUP_HOURS", "24")),
+
+        # Mini App
+        webapp_url=os.getenv("WEBAPP_URL", "").strip(),
     )

@@ -1,37 +1,55 @@
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Product } from "../types";
 import { formatMoney } from "../utils/money";
 
 type Props = {
   product: Product;
-  onAdd: (product: Product, quantity?: number) => void;
+  onAdd: (product: Product) => void;
   onView: (product: Product) => void;
 };
 
+/** Card compatta per la griglia 2/3 colonne, stile mini app Telegram. */
 export function ProductCard({ product, onAdd, onView }: Props) {
+  const soldOut = product.stock <= 0;
   return (
-    <article className="overflow-hidden rounded border border-olive-100 bg-white shadow-sm">
-      <button className="block w-full text-left" onClick={() => onView(product)}>
-        <div className="aspect-[4/3] overflow-hidden bg-olive-50">
-          <img src={product.image} alt={product.name} className="h-full w-full object-cover transition duration-300 hover:scale-105" />
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-olive-100/70 bg-white shadow-card">
+      <button className="relative block w-full text-left" onClick={() => onView(product)}>
+        <div className="aspect-square overflow-hidden bg-olive-50">
+          <img
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
         </div>
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="text-base font-bold leading-snug text-olive-900">{product.name}</h3>
-            <span className="shrink-0 font-bold text-clay">{formatMoney(product.price)}</span>
-          </div>
-          <p className="mt-2 line-clamp-2 text-sm leading-6 text-olive-700">{product.description}</p>
-        </div>
+        {product.volume && (
+          <span className="absolute left-2 top-2 rounded-full bg-olive-900/75 px-2 py-0.5 text-[10px] font-bold text-cream backdrop-blur-sm">
+            {product.volume}
+          </span>
+        )}
+        {soldOut && (
+          <span className="absolute inset-x-2 bottom-2 rounded-lg bg-clay/90 py-1 text-center text-[11px] font-bold text-cream">
+            Esaurito
+          </span>
+        )}
       </button>
-      <div className="flex border-t border-olive-100">
-        <button className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 text-sm font-bold text-olive-900" onClick={() => onView(product)}>
-          <Search size={16} />
-          Dettagli
+      <div className="flex flex-1 flex-col p-2.5">
+        <button className="text-left" onClick={() => onView(product)}>
+          <h3 className="line-clamp-2 min-h-[32px] text-[13px] font-bold leading-4 text-olive-900">
+            {product.name}
+          </h3>
         </button>
-        <button className="inline-flex flex-1 items-center justify-center gap-2 bg-olive-900 px-3 py-3 text-sm font-bold text-cream" onClick={() => onAdd(product, 1)}>
-          <Plus size={16} />
-          Aggiungi
-        </button>
+        <div className="mt-auto flex items-center justify-between pt-2">
+          <span className="text-sm font-extrabold text-olive-900">{formatMoney(product.price)}</span>
+          <button
+            aria-label={`Aggiungi ${product.name} al carrello`}
+            disabled={soldOut}
+            onClick={() => onAdd(product)}
+            className="grid h-8 w-8 place-items-center rounded-full bg-olive-900 text-cream active:scale-95"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
     </article>
   );
