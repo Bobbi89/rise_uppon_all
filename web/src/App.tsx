@@ -1,114 +1,51 @@
-import { useMemo, useState, useEffect } from "react";
-import { AdminDashboard } from "./components/AdminDashboard";
-import { CartSidebar } from "./components/CartSidebar";
-import { CategoryTabs } from "./components/CategoryTabs";
-import { CheckoutForm } from "./components/CheckoutForm";
-import { Hero } from "./components/Hero";
-import { LoginModal } from "./components/LoginModal";
-import { Navbar } from "./components/Navbar";
-import { OrdersList } from "./components/OrdersList";
+import { useEffect, useMemo, useState } from "react";
+import { CartSheet } from "./components/CartSheet";
+import { CategoryChips } from "./components/CategoryChips";
+import { CheckoutSheet } from "./components/CheckoutSheet";
+import { Header } from "./components/Header";
 import { ProductCard } from "./components/ProductCard";
-import { ProductDrawer } from "./components/ProductDrawer";
-import { TrackingCard } from "./components/TrackingCard";
-import { categories, initialOrders, products } from "./data/mockData";
-import type { CartItem, CategoryId, Order, PaymentMethod, Product, ShippingDetails } from "./types";
+import { ProductSheet } from "./components/ProductSheet";
+import { SuccessSheet } from "./components/SuccessSheet";
+import { products } from "./data/products";
+import { getTelegram, haptic, hapticSuccess, initTelegram, telegramUserName } from "./telegram";
+import type { CartItem, CategoryFilter, Order, PaymentMethod, Product, ShippingDetails } from "./types";
 import { formatMoney } from "./utils/money";
 
-const freeShippingMin = 100;
-const defaultShipping = 14;
-
-function scrollToSection(id: string) {
-  const node = document.getElementById(id);
-  if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-// Tipi per Telegram Web App SDK
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp: {
-        expand(): void;
-        enableClosingConfirmation(): void;
-        MainButton: {
-          show(): void;
-          hide(): void;
-          setText(text: string): void;
-          onClick(callback: () => void): void;
-          offClick(callback: () => void): void;
-        };
-        showPopup(params: {
-          title: string;
-          message: string;
-          buttons: Array<{ type: string; text: string; id: string }>;
-        }, callback: (btnId: string) => void): void;
-        showAlert(message: string): void;
-        initDataUnsafe?: {
-          user?: {
-            id: number;
-            first_name?: string;
-            last_name?: string;
-            username?: string;
-          };
-        };
-      };
-    };
-  }
-}
+const FREE_SHIPPING_MIN = 100;
+const DEFAULT_SHIPPING = 14;
 
 export default function App() {
-  const [activeCategory, setActiveCategory] = useState<CategoryId>("extra_virgin_olive_oil");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [lastPayment, setLastPayment] = useState<PaymentMethod | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
 
-  const filteredProducts = products.filter((product) => product.category === activeCategory);
-  const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shipping = cart.length === 0 || subtotal >= freeShippingMin ? 0 : defaultShipping;
-  const total = subtotal + shipping;
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const featuredOrder = orders.find((order) => order.trackingCode);
-
-  const relatedProducts = useMemo(() => {
-    if (!selectedProduct) return [];
-    return products.filter((product) => product.category === selectedProduct.category && product.id !== selectedProduct.id);
-  }, [selectedProduct]);
-
-  // Inizializza Telegram Web App
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
-
-    tg.expand(); // schermo intero
-    tg.enableClosingConfirmation(); // opzionale: chiedi conferma uscita
+    initTelegram();
   }, []);
 
-  // Gestione Telegram MainButton per checkout
-  useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
-
-    const totalItems = cartCount;
-    if (totalItems === 0) {
-      tg.MainButton.hide();
-      return;
-    }
-
-    tg.MainButton.setText(`Checkout (${totalItems})`).show();
-    tg.MainButton.onClick(() => {
-      setCartOpen(false);
-      scrollToSection("checkout");
+  const filteredProducts = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return products.filter((product) => {
+      if (category !== "all" && product.category !== category) return false;
+      if (!term) return true;
+      return (
+        product.name.toLowerCase().includes(term) ||
+        product.description.toLowerCase().includes(term)
+      );
     });
+  }, [category, query]);
 
-    // Pulizia evento al unmount
-    return () => {
-      tg.MainButton.offClick(() => {});
-    };
-  }, [cartCount]);
+  const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const shipping = cart.length === 0 || subtotal >= FREE_SHIPPING_MIN ? 0 : DEFAULT_SHIPPING;
+  const total = subtotal + shipping;
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   function addToCart(product: Product, quantity = 1) {
+    haptic("light");
     setCart((current) => {
       const existing = current.find((item) => item.product.id === product.id);
       if (existing) {
@@ -119,104 +56,150 @@ export default function App() {
       return [...current, { product, quantity }];
     });
     setSelectedProduct(null);
-    setCartOpen(true);
   }
 
   function updateCart(productId: string, quantity: number) {
+    haptic("light");
     if (quantity <= 0) {
       setCart((current) => current.filter((item) => item.product.id !== productId));
       return;
     }
-    setCart((current) => current.map((item) => (item.product.id === productId ? { ...item, quantity } : item)));
-  }
-
-  function navigate(target: string) {
-    if (target === "cart") {
-      setCartOpen(true);
-      return;
-    }
-    scrollToSection(target);
+    setCart((current) =>
+      current.map((item) => (item.product.id === productId ? { ...item, quantity } : item)),
+    );
   }
 
   function confirmOrder(details: ShippingDetails, method: PaymentMethod) {
     const order: Order = {
       id: `ON-${Math.floor(10000 + Math.random() * 89999)}`,
       date: new Date().toISOString().slice(0, 10),
-      status: "pagato",
+      status: "da pagare",
       total,
       items: cart,
     };
-    setOrders((current) => [order, ...current]);
+
+    hapticSuccess();
+    setCheckoutOpen(false);
     setCart([]);
-    setLastPayment(method);
-    alert(`Ordine ${order.id} generato per ${details.name}. Metodo: ${method === "stripe" ? "Stripe" : "Revolut Pay"}.`);
-    scrollToSection("orders");
+
+    // Se la mini app è stata aperta dal pulsante keyboard del bot,
+    // l'ordine arriva al bot via web_app_data e Telegram chiude la webapp.
+    const tg = getTelegram();
+    if (tg) {
+      try {
+        tg.sendData(
+          JSON.stringify({
+            type: "order",
+            order_id: order.id,
+            total,
+            shipping,
+            payment_method: method,
+            customer: details,
+            items: cart.map((item) => ({
+              id: item.product.id,
+              name: item.product.name,
+              price: item.product.price,
+              quantity: item.quantity,
+            })),
+          }),
+        );
+      } catch {
+        // aperta come link diretto: sendData non disponibile
+      }
+    }
+    setConfirmedOrder(order);
   }
 
+  const overlayOpen = selectedProduct !== null || cartOpen || checkoutOpen || confirmedOrder !== null;
+
   return (
-    <div className="min-h-screen bg-cream font-body text-olive-900">
-      <Navbar cartCount={cartCount} onNavigate={navigate} onOpenLogin={() => setLoginOpen(true)} />
-      <main>
-        <div id="home">
-          <Hero onCatalog={() => scrollToSection("catalog")} onCart={() => setCartOpen(true)} />
-        </div>
+    <div className="mx-auto min-h-dvh max-w-lg bg-cream font-body text-olive-900">
+      <Header
+        cartCount={cartCount}
+        query={query}
+        onQuery={setQuery}
+        onOpenCart={() => setCartOpen(true)}
+      />
 
-        <section id="catalog" className="bg-cream py-12">
-          <div className="mx-auto max-w-7xl px-4">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-widest text-gold">Catalogo prodotti</p>
-                <h2 className="mt-2 font-display text-4xl text-olive-900">Scegli, aggiungi, paga</h2>
-              </div>
-              <div className="rounded border border-olive-100 bg-white px-4 py-3 text-sm font-semibold text-olive-700">
-                Spedizione gratis da {formatMoney(freeShippingMin)}
-              </div>
-            </div>
-            <div className="mt-6">
-              <CategoryTabs active={activeCategory} onChange={setActiveCategory} />
-            </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} onAdd={addToCart} onView={setSelectedProduct} />
-              ))}
-            </div>
+      <main className="px-4 pb-28 pt-3">
+        <CategoryChips
+          active={category}
+          onChange={(next) => {
+            haptic("light");
+            setCategory(next);
+          }}
+        />
+
+        <p className="mt-2 text-[12px] font-semibold text-olive-400">
+          {filteredProducts.length} prodotti · Spedizione gratis da {formatMoney(FREE_SHIPPING_MIN)}
+        </p>
+
+        {filteredProducts.length === 0 ? (
+          <div className="mt-14 text-center">
+            <p className="text-4xl">🌿</p>
+            <p className="mt-3 text-sm font-semibold text-olive-700">
+              Nessun prodotto trovato. Prova un'altra ricerca.
+            </p>
           </div>
-        </section>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-2.5 min-[480px]:grid-cols-3">
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAdd={(item) => addToCart(item, 1)}
+                onView={setSelectedProduct}
+              />
+            ))}
+          </div>
+        )}
 
-        <CheckoutForm items={cart} total={total} onConfirm={confirmOrder} />
-        <OrdersList orders={orders} />
-        <TrackingCard order={featuredOrder} />
-        <AdminDashboard orders={orders} products={products} />
+        <footer className="mt-10 pb-4 text-center text-[11px] leading-5 text-olive-400">
+          Oro Naturale SRL · Prodotti biologici italiani
+          <br />
+          biomarketshop.com
+        </footer>
       </main>
 
-      <footer className="bg-cream px-4 py-8 text-center text-sm text-olive-700">
-        Oro Naturale SRL · biomarketshop.com · Stripe/Revolut Pay ready
-        {lastPayment ? <span className="block mt-2">Ultimo metodo selezionato: {lastPayment}</span> : null}
-      </footer>
+      {cartCount > 0 && !overlayOpen && (
+        <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 mx-auto max-w-lg px-4 pb-3">
+          <button
+            className="flex w-full items-center justify-between rounded-full bg-olive-900 px-5 py-3.5 text-sm font-extrabold text-cream shadow-bar active:scale-[0.98]"
+            onClick={() => setCartOpen(true)}
+          >
+            <span>🛒 Carrello · {cartCount} {cartCount === 1 ? "articolo" : "articoli"}</span>
+            <span>{formatMoney(total)}</span>
+          </button>
+        </div>
+      )}
 
-      <ProductDrawer
-        product={selectedProduct}
-        related={relatedProducts}
-        onClose={() => setSelectedProduct(null)}
-        onAdd={addToCart}
-        onView={setSelectedProduct}
-      />
-      <CartSidebar
+      <ProductSheet product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={addToCart} />
+
+      <CartSheet
         open={cartOpen}
         items={cart}
         subtotal={subtotal}
         shipping={shipping}
         total={total}
+        freeShippingMin={FREE_SHIPPING_MIN}
         onClose={() => setCartOpen(false)}
         onUpdate={updateCart}
-        onRemove={(productId) => setCart((current) => current.filter((item) => item.product.id !== productId))}
-        onClear={() => setCart([])}
         onCheckout={() => {
           setCartOpen(false);
-          scrollToSection("checkout");
+          setCheckoutOpen(true);
         }}
       />
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onGuest={() => setLoginOpen(false)} />
+
+      <CheckoutSheet
+        open={checkoutOpen}
+        items={cart}
+        total={total}
+        defaultName={telegramUserName() ?? undefined}
+        onClose={() => setCheckoutOpen(false)}
+        onConfirm={confirmOrder}
+      />
+
+      <SuccessSheet order={confirmedOrder} onClose={() => setConfirmedOrder(null)} />
     </div>
   );
 }

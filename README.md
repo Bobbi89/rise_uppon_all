@@ -2,6 +2,30 @@
 
 Telegram bot per promuovere i prodotti Oro Naturale e rispondere a richieste di catalogo, prezzi e ordini.
 
+## Mini App (marketplace in-chat)
+
+Nella cartella `web/` c'è la Mini App Telegram: un marketplace biologico mobile-first
+con griglia prodotti compatta a 2/3 colonne, ricerca, filtri per categoria,
+scheda prodotto, carrello e checkout in bottom sheet — tutto in stile app Telegram.
+
+```bash
+cd web
+npm install
+npm run dev      # sviluppo su http://localhost:5173
+npm run build    # build di produzione in web/dist
+```
+
+Per collegarla al bot:
+
+1. Deploya `web/dist` su un hosting HTTPS (Vercel, Netlify, Railway static...).
+2. Imposta `WEBAPP_URL=https://tuo-dominio` nelle variabili d'ambiente del bot.
+3. Il bot mostra il pulsante **🌿 Apri il Negozio** nel menu principale e nel
+   messaggio di benvenuto. Gli ordini confermati nella Mini App arrivano al bot
+   via `web_app_data`: l'utente riceve la conferma in chat e gli admin la notifica.
+
+Il catalogo della Mini App è generato da `products.json`
+(file `web/src/data/products.ts`).
+
 ## Setup rapido
 
 1. Crea un bot con BotFather e inserisci il token in `.env`.

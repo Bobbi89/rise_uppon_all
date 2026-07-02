@@ -1,10 +1,17 @@
 export type CategoryId =
   | "extra_virgin_olive_oil"
-  | "flavored_oil"
-  | "wine"
+  | "flavored_oils"
+  | "wines"
   | "cosmetics"
-  | "gift_box"
-  | "gourmet";
+  | "gift_boxes";
+
+export type CategoryFilter = CategoryId | "all";
+
+export type Category = {
+  id: CategoryFilter;
+  label: string;
+  emoji: string;
+};
 
 export type Product = {
   id: string;
@@ -14,6 +21,8 @@ export type Product = {
   image: string;
   description: string;
   volume?: string;
+  origin?: string;
+  tags?: string[];
   featured?: boolean;
   stock: number;
 };
@@ -36,12 +45,13 @@ export type Order = {
   trackingUrl?: string;
 };
 
-export type PaymentMethod = "stripe" | "revolut";
+export type PaymentMethod = "stripe" | "revolut" | "bonifico";
 
 export type ShippingDetails = {
   name: string;
-  email: string;
+  phone: string;
   address: string;
   city: string;
-  country: string;
+  zip: string;
+  notes?: string;
 };

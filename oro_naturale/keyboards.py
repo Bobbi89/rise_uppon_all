@@ -34,6 +34,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 
 
@@ -89,6 +90,7 @@ BTN_PROFILO    = "👤 Profilo"
 BTN_NEGOZIO    = "📍 Negozio"
 BTN_SUPPORTO   = "🎧 Supporto"
 BTN_MENU       = "🔙 Menu principale"
+BTN_WEBAPP     = "🌿 Apri il Negozio"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -114,11 +116,12 @@ def _btn_url(text: str, url: str) -> InlineKeyboardButton:
 #  SCREEN 01 — HOME
 # ═══════════════════════════════════════════════════════════════════
 
-def main_menu(cart_count: int = 0) -> ReplyKeyboardMarkup:
+def main_menu(cart_count: int = 0, webapp_url: str | None = None) -> ReplyKeyboardMarkup:
     """
     Reply keyboard fissa — visibile sempre in basso.
 
     Layout V3:
+        [ 🌿 Apri il Negozio (Mini App, solo se webapp_url) ]
         [ 🛍️ Catalogo ]  [ 🔍 Cerca       ]
         [ 🛒 Carrello  ]  [ 📦 Miei ordini  ]
         [ ❤️ Preferiti ]  [ 👤 Profilo      ]
@@ -127,21 +130,34 @@ def main_menu(cart_count: int = 0) -> ReplyKeyboardMarkup:
     cart_label = (
         f"{BTN_CARRELLO} ({cart_count})" if cart_count > 0 else BTN_CARRELLO
     )
+    keyboard: list[list[KeyboardButton]] = []
+    if webapp_url:
+        # Bottone reply-keyboard web_app: la mini app può rimandare
+        # l'ordine al bot via Telegram.WebApp.sendData → message.web_app_data
+        keyboard.append([
+            KeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url)),
+        ])
+    keyboard.extend([
+        [KeyboardButton(text=BTN_CATALOGO),  KeyboardButton(text=BTN_CERCA)],
+        [KeyboardButton(text=cart_label),     KeyboardButton(text=BTN_ORDINI)],
+        [KeyboardButton(text=BTN_PREFERITI),  KeyboardButton(text=BTN_PROFILO)],
+        [KeyboardButton(text=BTN_NEGOZIO),    KeyboardButton(text=BTN_SUPPORTO)],
+    ])
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=BTN_CATALOGO),  KeyboardButton(text=BTN_CERCA)],
-            [KeyboardButton(text=cart_label),     KeyboardButton(text=BTN_ORDINI)],
-            [KeyboardButton(text=BTN_PREFERITI),  KeyboardButton(text=BTN_PROFILO)],
-            [KeyboardButton(text=BTN_NEGOZIO),    KeyboardButton(text=BTN_SUPPORTO)],
-        ],
+        keyboard=keyboard,
         resize_keyboard=True,
         is_persistent=True,
     )
 
 
-def welcome_menu() -> InlineKeyboardMarkup:
+def welcome_menu(webapp_url: str | None = None) -> InlineKeyboardMarkup:
     """Inline keyboard nel messaggio di benvenuto (screen 01)."""
-    return _ikb(
+    rows: list[list[InlineKeyboardButton]] = []
+    if webapp_url:
+        rows.append([
+            InlineKeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url)),
+        ])
+    rows.extend([
         [_btn("🛍️ Apri Catalogo Prodotti", "show_categories")],
         [
             _btn("📦 I Miei Ordini", "orders_list"),
@@ -151,7 +167,8 @@ def welcome_menu() -> InlineKeyboardMarkup:
             _btn("💬 Assistenza", "support"),
             _btn("ℹ️ Spedizioni", "info_shipping"),
         ],
-    )
+    ])
+    return _ikb(*rows)
 
 
 def back_only() -> ReplyKeyboardMarkup:

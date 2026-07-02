@@ -1,6 +1,8 @@
 # oro_naturale/routers/public.py
 from __future__ import annotations
 
+import asyncio
+import json
 import time
 from typing import Any
 
@@ -217,12 +219,12 @@ def build_public_router(ctx: BotContext) -> Router:
             "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.\n\n"
             "Usa il menu qui sotto per navigare il catalogo, "
             "gestire il carrello e completare i tuoi ordini.",
-            reply_markup=main_menu(count),
+            reply_markup=main_menu(count, ctx.settings.webapp_url),
         )
         await safe_send_message(
             message,
             "Cosa vuoi fare oggi?",
-            reply_markup=welcome_menu(),
+            reply_markup=welcome_menu(ctx.settings.webapp_url),
         )
 
     @router.message(Command("help"))
@@ -238,7 +240,7 @@ def build_public_router(ctx: BotContext) -> Router:
         await safe_send_message(
             callback,
             "🏠 Menu principale",
-            reply_markup=main_menu(count),
+            reply_markup=main_menu(count, ctx.settings.webapp_url),
         )
         await callback.answer()
 
@@ -415,13 +417,84 @@ def build_public_router(ctx: BotContext) -> Router:
             callback,
             f"✅ <b>{product.name}</b> aggiunto al carrello (x{qty})\n"
             f"🛒 Totale articoli: {count}",
-            reply_markup=main_menu(count),
+            reply_markup=main_menu(count, ctx.settings.webapp_url),
         )
         await callback.answer(f"Aggiunto x{qty}!")
 
     @router.callback_query(F.data == "noop")
     async def cb_noop(callback: CallbackQuery) -> None:
         await callback.answer()
+
+    # ─────────────────────────────────────────────────────────────
+    #  MINI APP — ordini inviati dalla webapp via sendData
+    # ─────────────────────────────────────────────────────────────
+
+    @router.message(F.web_app_data)
+    async def webapp_order(message: Message) -> None:
+        """Riceve l'ordine dalla Mini App (Telegram.WebApp.sendData)."""
+        try:
+            payload = json.loads(message.web_app_data.data)
+        except (json.JSONDecodeError, AttributeError):
+            await safe_send_message(message, "⚠️ Dati ordine non validi. Riprova dalla Mini App.")
+            return
+        if payload.get("type") != "order":
+            return
+
+        user_id = message.from_user.id if message.from_user else 0
+        order_id = payload.get("order_id") or f"ON{int(time.time())}"
+        total = float(payload.get("total") or 0)
+        customer = payload.get("customer") or {}
+        items = payload.get("items") or []
+        method = payload.get("payment_method") or "da definire"
+
+        ctx.store.append_jsonl("orders.jsonl", {
+            "order_id": order_id,
+            "ts": int(time.time()),
+            "user_id": user_id,
+            "username": message.from_user.username if message.from_user else None,
+            "chat_id": message.chat.id,
+            "total": total,
+            "shipping": payload.get("shipping"),
+            "payment_method": method,
+            "customer": customer,
+            "items": items,
+            "source": "miniapp",
+        })
+
+        record = customer_record(user_id)
+        record["chat_id"] = message.chat.id
+        record["stage"] = "payment_pending"
+        save_customer(user_id, record)
+
+        item_lines = "\n".join(
+            f"  • {i.get('quantity', 1)}× {i.get('name', '?')} — € {float(i.get('price', 0)) * int(i.get('quantity', 1)):.2f}"
+            for i in items
+        )
+        await safe_send_message(
+            message,
+            f"🌿 <b>Ordine ricevuto!</b> <code>#{order_id}</code>\n\n"
+            f"{item_lines}\n\n"
+            f"💰 Totale: <b>€ {total:.2f}</b>\n"
+            f"💳 Pagamento: {method}\n"
+            f"📦 Spedizione a: {customer.get('address', '')}, {customer.get('city', '')}\n\n"
+            "Ti invieremo a breve la conferma e le istruzioni di pagamento. Grazie! 🙏",
+            reply_markup=main_menu(cart_count(user_id), ctx.settings.webapp_url),
+        )
+
+        for admin_id in ctx.settings.admin_chat_ids:
+            try:
+                await message.bot.send_message(
+                    admin_id,
+                    f"🔔 <b>NUOVO ORDINE MINI APP</b> <code>#{order_id}</code>\n"
+                    f"👤 @{message.from_user.username or user_id}\n"
+                    f"🙍 {customer.get('name', '?')} · {customer.get('phone', '?')}\n"
+                    f"📍 {customer.get('address', '')}, {customer.get('zip', '')} {customer.get('city', '')}\n"
+                    f"💴 € {total:.2f} | {method}\n"
+                    f"{item_lines}",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
 
     # ─────────────────────────────────────────────────────────────
     #  SCREEN 03 — CARRELLO
@@ -1321,7 +1394,7 @@ def build_public_router(ctx: BotContext) -> Router:
             message,
             "Posso aiutarti con catalogo, carrello, spedizione, ordini e pagamenti.\n"
             "Usa il menu qui sotto o scrivi <i>voglio fare un ordine</i>.",
-            reply_markup=main_menu(cart_count(user_id)),
+            reply_markup=main_menu(cart_count(user_id), ctx.settings.webapp_url),
         )
 
     return router
