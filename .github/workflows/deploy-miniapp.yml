@@ -1,0 +1,55 @@
+name: Deploy Mini App su GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+      - claude/telegram-organic-marketplace-6siktx
+    paths:
+      - "web/**"
+      - "deploy/**"
+      - ".github/workflows/deploy-miniapp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Mini App
+        working-directory: web
+        run: |
+          npm ci
+          npx vite build --config vite.single.config.js
+
+      - name: Prepara sito statico
+        run: |
+          mkdir -p _site
+          cp web/dist-single/index.html _site/index.html
+
+      - name: Configura GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Carica artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy su GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
