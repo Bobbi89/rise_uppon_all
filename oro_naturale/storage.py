@@ -22,9 +22,6 @@ from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
-# Connessione PostgreSQL (Railway)
-DATABASE_URL = os.environ["DATABASE_URL"]
-
 
 # ═══════════════════════════════════════════════════════════════════
 #  FileStore
@@ -85,6 +82,39 @@ class FileStore:
         except OSError as exc:
             logger.error("save_json: errore scrittura %s — %s", path, exc)
 
+    # ── JSONL (append-only: ordini, pagamenti) ────────────────────
+
+    def append_jsonl(self, filename: str, obj: Any) -> None:
+        """Aggiunge una riga JSON a un file .jsonl (una entry per riga)."""
+        path = self.json_path(filename)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(obj, ensure_ascii=False, default=str) + "\n")
+        except OSError as exc:
+            logger.error("append_jsonl: errore scrittura %s — %s", path, exc)
+
+    def tail_jsonl(self, filename: str, limit: int = 10) -> list[dict]:
+        """Legge le ultime `limit` righe di un file .jsonl (più recenti per ultime)."""
+        path = self.json_path(filename)
+        if not path.exists():
+            return []
+        items: list[dict] = []
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        items.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        logger.warning("tail_jsonl: riga corrotta in %s ignorata", path)
+        except OSError as exc:
+            logger.warning("tail_jsonl: errore lettura %s — %s", path, exc)
+            return []
+        return items[-limit:]
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  Prodotti — carica da PostgreSQL
@@ -97,8 +127,13 @@ def load_products_from_db() -> list:
     """
     from .models import Product  # import locale — sicuro, models non importa storage
 
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        logger.warning("load_products_from_db: DATABASE_URL non impostata, nessun prodotto dal DB")
+        return []
+
     try:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
         cur = conn.cursor()
         cur.execute("SELECT * FROM products")
         rows = cur.fetchall()

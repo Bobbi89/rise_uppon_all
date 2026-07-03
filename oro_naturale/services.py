@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import time
 from dataclasses import dataclass
@@ -71,13 +70,13 @@ def detect_format(text: str) -> Optional[str]:
 
 
 def parse_total(text: str) -> Optional[float]:
-    match = re.search(r"(totale|total|gesamt)[^0-9]*([0-9]+([.,][0-9]+)?)", text, re.I)
+    match = re.search(r"(?:totale|total|gesamt)[^0-9]*([0-9]+(?:[.,][0-9]+)?)", text, re.I)
     if not match:
-        match = re.search(r"([0-9]+([.,][0-9]+)?)\s*(eur|€)", text, re.I)
+        match = re.search(r"([0-9]+(?:[.,][0-9]+)?)\s*(?:eur|€)", text, re.I)
     if not match:
         return None
     try:
-        return float(match.group(2).replace(",", "."))
+        return float(match.group(1).replace(",", "."))
     except ValueError:
         return None
 

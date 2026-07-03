@@ -84,11 +84,11 @@ def migrate_products():
             name = p.get("name_it") or ""
             description = p.get("description_it") or ""
 
-            # Converte stringhe in tipi corretti
-            price = float(p.get("price", "0"))
-            stock = int(p.get("stock", "0"))
-            featured = p.get("featured", "false").lower() == "true"
-            is_sample = p.get("is_sample", "false").lower() == "true"
+            # Converte in tipi corretti (i campi possono essere str, int o bool)
+            price = float(p.get("price") or 0)
+            stock = int(p.get("stock") or 0)
+            featured = str(p.get("featured", "false")).lower() == "true"
+            is_sample = str(p.get("is_sample", "false")).lower() == "true"
 
             # Converti attributes in JSON string
             attributes = p.get("attributes")
@@ -156,7 +156,7 @@ class RetryTelegramMiddleware:
         for attempt in range(self.max_retries):
             try:
                 return await handler(event, data)
-            except TelegramNetworkError as e:
+            except TelegramNetworkError:
                 if attempt == self.max_retries - 1:
                     raise  # ultimo tentativo, rilancio
                 wait = self.base_delay * (2 ** attempt)  # backoff esponenziale

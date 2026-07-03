@@ -333,19 +333,19 @@ def cart_menu(has_items: bool = True) -> InlineKeyboardMarkup:
     )
 
 
-def shipping_menu() -> InlineKeyboardMarkup:
+def shipping_menu(home_cost: float = 4.90) -> InlineKeyboardMarkup:
     """
     Scelta metodo di spedizione (screen 03).
 
     Layout V3:
-        [ 📦 Spedizione a casa  (+€4,90) ]
+        [ 📦 Spedizione a casa  (+€X,XX) ]
         [ 🏪 Ritiro in negozio (gratuito) ]
         [ ◀ Torna al carrello            ]
     """
     return _ikb(
-        [_btn("📦 Spedizione a casa  (+€4,90)",  "ship:home")],
-        [_btn("🏪 Ritiro in negozio (gratuito)", "ship:pickup")],
-        [_btn("◀ Torna al carrello",             "show_cart")],
+        [_btn(f"📦 Spedizione a casa  (+€{home_cost:.2f})", "ship:home")],
+        [_btn("🏪 Ritiro in negozio (gratuito)",            "ship:pickup")],
+        [_btn("◀ Torna al carrello",                        "show_cart")],
     )
 
 
@@ -667,7 +667,6 @@ def format_product_card(p: dict) -> str:
 
     cat_meta  = CATEGORY_META.get(category, {})
     cat_emoji = cat_meta.get("emoji", "📦")
-    cat_label = cat_meta.get("label", category.replace("_", " ").title())
 
     sep = "━" * 20
     text = (

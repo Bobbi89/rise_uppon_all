@@ -14,7 +14,7 @@ try:
         print("ERRORE: La variabile DATABASE_URL non è trovata!")
         sys.exit(1)
 
-    print(f"Tentativo di connessione al database...")
+    print("Tentativo di connessione al database...")
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
     
