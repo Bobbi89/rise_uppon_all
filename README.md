@@ -15,13 +15,29 @@ npm run dev      # sviluppo su http://localhost:5173
 npm run build    # build di produzione in web/dist
 ```
 
-Per collegarla al bot:
+### Deploy automatico (GitHub Pages)
 
-1. Deploya `web/dist` su un hosting HTTPS (Vercel, Netlify, Railway static...).
-2. Imposta `WEBAPP_URL=https://tuo-dominio` nelle variabili d'ambiente del bot.
-3. Il bot mostra il pulsante **🌿 Apri il Negozio** nel menu principale e nel
+Il workflow `.github/workflows/deploy-miniapp.yml` compila la Mini App e la
+pubblica sul branch `gh-pages` a ogni push che tocca `web/` o `deploy/`.
+
+**Attivazione una tantum** (solo la prima volta): su GitHub vai in
+*Settings → Pages → Build and deployment → Source: Deploy from a branch*,
+scegli branch `gh-pages` e cartella `/ (root)`, poi salva.
+Il sito sarà online su:
+
+```
+https://bobbi89.github.io/rise_uppon_all/
+```
+
+### Collegamento al bot
+
+1. Su Railway aggiungi la variabile d'ambiente
+   `WEBAPP_URL=https://bobbi89.github.io/rise_uppon_all/` e riavvia il bot.
+2. Il bot mostra il pulsante **🌿 Apri il Negozio** nel menu principale e nel
    messaggio di benvenuto. Gli ordini confermati nella Mini App arrivano al bot
    via `web_app_data`: l'utente riceve la conferma in chat e gli admin la notifica.
+3. (Opzionale) In BotFather: *Bot Settings → Menu Button* con lo stesso URL
+   per avere il pulsante del negozio accanto alla casella di testo.
 
 Il catalogo della Mini App è generato da `products.json`
 (file `web/src/data/products.ts`).
