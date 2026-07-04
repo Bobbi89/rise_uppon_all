@@ -484,3 +484,27 @@ def test_start_falls_back_to_text_shop_without_webapp(monkeypatch, tmp_path):
             for row in m["markup"].inline_keyboard:
                 for b in row:
                     assert b.web_app is None
+
+
+# ─── WEBAPP_URL: normalizzazione https + guardia tastiere ────────────
+
+def test_normalize_https_adds_scheme():
+    from oro_naturale.config import _normalize_https
+
+    assert _normalize_https("on-bt-tg-production.up.railway.app") == "https://on-bt-tg-production.up.railway.app"
+    assert _normalize_https("http://x.up.railway.app/") == "https://x.up.railway.app"
+    assert _normalize_https("https://x.app/") == "https://x.app"
+    assert _normalize_https("") == ""
+
+
+def test_menus_skip_webapp_button_for_non_https():
+    # Regressione: un WEBAPP_URL senza https:// faceva crashare /start
+    # (Telegram rifiuta i pulsanti web_app non-HTTPS). Ora non si emette.
+    m = main_menu(0, "on-bt-tg-production.up.railway.app")
+    assert all(getattr(b, "web_app", None) is None for row in m.keyboard for b in row)
+    w = welcome_menu("on-bt-tg-production.up.railway.app")
+    assert all(b.web_app is None for row in w.inline_keyboard for b in row)
+
+    # con https il pulsante c'è
+    m2 = main_menu(0, "https://shop.example")
+    assert m2.keyboard[0][0].web_app.url == "https://shop.example"

@@ -112,6 +112,11 @@ def _btn_url(text: str, url: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, url=url)
 
 
+def _is_https(url: str | None) -> bool:
+    """True se l'URL è utilizzabile per un pulsante Web App (Telegram vuole HTTPS)."""
+    return bool(url) and str(url).startswith("https://")
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  SCREEN 01 — HOME
 # ═══════════════════════════════════════════════════════════════════
@@ -131,9 +136,8 @@ def main_menu(cart_count: int = 0, webapp_url: str | None = None) -> ReplyKeyboa
         f"{BTN_CARRELLO} ({cart_count})" if cart_count > 0 else BTN_CARRELLO
     )
     keyboard: list[list[KeyboardButton]] = []
-    if webapp_url:
-        # Bottone reply-keyboard web_app: la mini app può rimandare
-        # l'ordine al bot via Telegram.WebApp.sendData → message.web_app_data
+    if _is_https(webapp_url):
+        # Telegram accetta web_app solo con URL HTTPS valido.
         keyboard.append([
             KeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url)),
         ])
@@ -181,7 +185,7 @@ def welcome_menu(webapp_url: str | None = None) -> InlineKeyboardMarkup:
     non c'è la Mini App.
     """
     rows: list[list[InlineKeyboardButton]] = []
-    if webapp_url:
+    if _is_https(webapp_url):
         rows.append([
             InlineKeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url)),
         ])
