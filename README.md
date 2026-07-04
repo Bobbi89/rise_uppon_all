@@ -15,11 +15,47 @@ npm run dev      # sviluppo su http://localhost:5173
 npm run build    # build di produzione in web/dist
 ```
 
+### Pagamenti Revolut, ordini su DB, profili utente/admin
+
+Il checkout usa la **Revolut Merchant API** (carta, Revolut Pay e Apple Pay
+dove supportato). Il flusso:
+
+1. la Mini App invia carrello + spedizione all'API (`POST /api/orders`);
+2. il server **ricalcola i prezzi dal catalogo** (niente manomissioni),
+   crea l'ordine su PostgreSQL e un ordine Revolut, e restituisce il token
+   pubblico;
+3. la Mini App apre il popup Revolut (`RevolutCheckout`) per pagare;
+4. il server verifica il pagamento con Revolut, marca l'ordine `paid` e
+   **notifica gli admin** in chat.
+
+Tutto è salvato su PostgreSQL (tabelle `customers` e `orders`):
+
+- **Profilo utente** (icona 👤): ogni utente vede i propri ordini, stato,
+  indirizzo e codice di tracking. L'utente è autenticato validando l'`initData`
+  firmato da Telegram, quindi vede solo i suoi ordini.
+- **Profilo admin** (icona 🛡️, visibile solo agli `ADMIN_CHAT_ID`): elenco di
+  tutti gli ordini ricevuti con dati cliente; l'admin inserisce **corriere +
+  codice tracking** per ogni ordine e l'utente riceve la notifica in chat.
+
+Variabili d'ambiente Revolut (accetta anche le varianti `Revolut_public_api` /
+`revolut_secret_api`):
+
+```
+REVOLUT_PUBLIC_API=pk_...
+REVOLUT_SECRET_API=sk_...
+REVOLUT_MODE=sandbox      # "prod" per incassare davvero
+```
+
+> ⚠️ Ordini, pagamenti e profili funzionano **solo quando la Mini App è servita
+> dal servizio Railway** (l'API è su `/api`, stesso dominio). Imposta perciò
+> `WEBAPP_URL` sul dominio Railway (o lascialo vuoto per l'auto-rilevamento).
+> GitHub Pages resta utilizzabile solo come vetrina statica senza checkout.
+
 ### Deploy su Railway (servizio unico — consigliato)
 
-Lo **stesso processo** che esegue il bot serve anche la Mini App. All'avvio,
-se Railway fornisce una `PORT`, `main.py` apre un web server (aiohttp) che
-distribuisce `web/dist` e Railway gli assegna un dominio HTTPS pubblico.
+Lo **stesso processo** che esegue il bot serve anche la Mini App e la sua API.
+All'avvio, se Railway fornisce una `PORT`, `main.py` apre un web server (aiohttp)
+che distribuisce `web/dist` + `/api` e Railway gli assegna un dominio HTTPS.
 
 Non serve configurare nulla a mano:
 

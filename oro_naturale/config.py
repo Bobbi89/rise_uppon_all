@@ -30,7 +30,13 @@ class Settings:
     # Pagamenti (Stripe)
     stripe_secret_key: str
     stripe_currency: str
-    
+
+    # Pagamenti (Revolut Merchant API)
+    revolut_public_key: str   # chiave pubblica (client-side RevolutCheckout)
+    revolut_secret_key: str   # chiave segreta (server-side, crea ordini)
+    revolut_mode: str         # "sandbox" | "prod"
+    revolut_api_version: str
+
     # Automazioni
     followup_hours: float     # Ore dopo le quale inviare un messaggio di follow-up
 
@@ -78,6 +84,15 @@ def _resolve_web_port() -> int | None:
     return None
 
 
+def _env_any(*names: str, default: str = "") -> str:
+    """Primo valore non vuoto tra più possibili nomi di variabile (case varianti)."""
+    for name in names:
+        value = os.getenv(name)
+        if value and value.strip():
+            return value.strip()
+    return default
+
+
 def load_settings() -> Settings:
     """Carica le impostazioni dalle variabili d'ambiente."""
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -101,6 +116,16 @@ def load_settings() -> Settings:
         # Pagamenti
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", "").strip(),
         stripe_currency=os.getenv("STRIPE_CURRENCY", "eur").strip().lower(),
+
+        # Revolut (accetta più varianti di nome per le chiavi)
+        revolut_public_key=_env_any(
+            "REVOLUT_PUBLIC_API", "Revolut_public_api", "REVOLUT_PUBLIC_KEY"
+        ),
+        revolut_secret_key=_env_any(
+            "REVOLUT_SECRET_API", "revolut_secret_api", "REVOLUT_SECRET_KEY"
+        ),
+        revolut_mode=(_env_any("REVOLUT_MODE", default="sandbox").lower()),
+        revolut_api_version=_env_any("REVOLUT_API_VERSION", default="2024-09-01"),
         
         # Follow-up ordini (es. 24h dopo l'acquisto per recensione/assistenza)
         followup_hours=float(os.getenv("FOLLOWUP_HOURS", "24")),

@@ -1,13 +1,24 @@
-import { Leaf, Search, ShoppingBag } from "lucide-react";
+import { Leaf, Search, ShieldCheck, ShoppingBag, User } from "lucide-react";
 
 type Props = {
   cartCount: number;
   query: string;
+  isAdmin: boolean;
   onQuery: (value: string) => void;
   onOpenCart: () => void;
+  onOpenProfile: () => void;
+  onOpenAdmin: () => void;
 };
 
-export function Header({ cartCount, query, onQuery, onOpenCart }: Props) {
+export function Header({
+  cartCount,
+  query,
+  isAdmin,
+  onQuery,
+  onOpenCart,
+  onOpenProfile,
+  onOpenAdmin,
+}: Props) {
   return (
     <header className="sticky top-0 z-40 bg-olive-900 px-4 pb-3 pt-4 text-cream">
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
@@ -22,18 +33,36 @@ export function Header({ cartCount, query, onQuery, onOpenCart }: Props) {
             </p>
           </div>
         </div>
-        <button
-          aria-label="Apri carrello"
-          className="relative grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-cream"
-          onClick={onOpenCart}
-        >
-          <ShoppingBag size={18} />
-          {cartCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-olive-900">
-              {cartCount}
-            </span>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              aria-label="Pannello admin"
+              className="grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-gold-light"
+              onClick={onOpenAdmin}
+            >
+              <ShieldCheck size={18} />
+            </button>
           )}
-        </button>
+          <button
+            aria-label="I miei ordini"
+            className="grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-cream"
+            onClick={onOpenProfile}
+          >
+            <User size={18} />
+          </button>
+          <button
+            aria-label="Apri carrello"
+            className="relative grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-cream"
+            onClick={onOpenCart}
+          >
+            <ShoppingBag size={18} />
+            {cartCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-olive-900">
+                {cartCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
       <div className="mx-auto mt-3 flex max-w-lg items-center gap-2 rounded-xl bg-olive-800 px-3.5 py-2.5">
         <Search size={16} className="shrink-0 text-olive-200" />

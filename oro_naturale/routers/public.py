@@ -61,6 +61,8 @@ from ..keyboards import (
     store_menu,
     support_menu,
     tracking_menu,
+    webapp_gateway_menu,
+    webapp_launch_menu,
     welcome_menu,
 )
 from ..services import (
@@ -207,19 +209,34 @@ def build_public_router(ctx: BotContext) -> Router:
         else:
             count = 0
 
-        await safe_send_message(
-            message,
-            "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
-            "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.\n\n"
-            "Usa il menu qui sotto per navigare il catalogo, "
-            "gestire il carrello e completare i tuoi ordini.",
-            reply_markup=main_menu(count, ctx.settings.webapp_url),
-        )
-        await safe_send_message(
-            message,
-            "Cosa vuoi fare oggi?",
-            reply_markup=welcome_menu(ctx.settings.webapp_url),
-        )
+        if ctx.settings.webapp_url.startswith("https://"):
+            # Esperienza mini-app-first: /start reindirizza al marketplace,
+            # non allo shop testuale in chat.
+            await safe_send_message(
+                message,
+                "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
+                "Il nostro negozio di prodotti biologici è qui, dentro Telegram.\n"
+                "👇 Tocca <b>Apri il Negozio</b> per entrare.",
+                reply_markup=webapp_launch_menu(ctx.settings.webapp_url),
+            )
+            await safe_send_message(
+                message,
+                "🛒 Sfoglia i prodotti in griglia, aggiungi al carrello e ordina in pochi tap:",
+                reply_markup=webapp_gateway_menu(ctx.settings.webapp_url),
+            )
+        else:
+            # Fallback: nessuna Mini App configurata → shop testuale in chat.
+            await safe_send_message(
+                message,
+                "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
+                "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.",
+                reply_markup=main_menu(count, ctx.settings.webapp_url),
+            )
+            await safe_send_message(
+                message,
+                "Cosa vuoi fare oggi?",
+                reply_markup=welcome_menu(ctx.settings.webapp_url),
+            )
 
     @router.message(Command("help"))
     async def help_cmd(message: Message) -> None:

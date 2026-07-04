@@ -90,7 +90,7 @@ BTN_PROFILO    = "👤 Profilo"
 BTN_NEGOZIO    = "📍 Negozio"
 BTN_SUPPORTO   = "🎧 Supporto"
 BTN_MENU       = "🔙 Menu principale"
-BTN_WEBAPP     = "🌿 Apri il Negozio"
+BTN_WEBAPP     = "🛒 Apri il Negozio"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -121,7 +121,7 @@ def main_menu(cart_count: int = 0, webapp_url: str | None = None) -> ReplyKeyboa
     Reply keyboard fissa — visibile sempre in basso.
 
     Layout V3:
-        [ 🌿 Apri il Negozio (Mini App, solo se webapp_url) ]
+        [ 🛒 Apri il Marketplace (Mini App, solo se webapp_url) ]
         [ 🛍️ Catalogo ]  [ 🔍 Cerca       ]
         [ 🛒 Carrello  ]  [ 📦 Miei ordini  ]
         [ ❤️ Preferiti ]  [ 👤 Profilo      ]
@@ -150,15 +150,45 @@ def main_menu(cart_count: int = 0, webapp_url: str | None = None) -> ReplyKeyboa
     )
 
 
+def webapp_launch_menu(webapp_url: str) -> ReplyKeyboardMarkup:
+    """
+    Tastiera persistente con UN SOLO pulsante: apre il Negozio (Mini App).
+    Nessun altro pulsante, così l'utente entra direttamente nel negozio.
+    """
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url))],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
+
+
+def webapp_gateway_menu(webapp_url: str) -> InlineKeyboardMarkup:
+    """Messaggio-gateway: unico pulsante inline che apre il Negozio a schermo intero."""
+    return _ikb(
+        [InlineKeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url))],
+    )
+
+
 def welcome_menu(webapp_url: str | None = None) -> InlineKeyboardMarkup:
-    """Inline keyboard nel messaggio di benvenuto (screen 01)."""
+    """
+    Inline keyboard nel messaggio di benvenuto (screen 01).
+
+    Se la Mini App è disponibile, il pulsante che la apre è il CTA principale
+    in cima (a tutta larghezza). Il marketplace È il catalogo, quindi il
+    pulsante testuale "Catalogo" viene mostrato solo come fallback quando
+    non c'è la Mini App.
+    """
     rows: list[list[InlineKeyboardButton]] = []
     if webapp_url:
         rows.append([
             InlineKeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url)),
         ])
+    else:
+        rows.append([_btn("🛍️ Apri Catalogo Prodotti", "show_categories")])
+
     rows.extend([
-        [_btn("🛍️ Apri Catalogo Prodotti", "show_categories")],
         [
             _btn("📦 I Miei Ordini", "orders_list"),
             _btn("⭐ Preferiti",    "fav_list"),

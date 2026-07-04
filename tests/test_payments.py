@@ -1,0 +1,302 @@
+# Test per pagamenti Revolut, DB ordini/clienti, auth initData e API.
+# I test DB/API si auto-saltano se non c'è un Postgres di test raggiungibile.
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import hmac
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import urlencode
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from oro_naturale.revolut import RevolutClient, RevolutError, is_paid  # noqa: E402
+from oro_naturale.webauth import user_id_from_init_data, validate_init_data  # noqa: E402
+
+BOT_TOKEN = "123456:TESTTOKEN"
+
+
+def make_init_data(user: dict, bot_token: str = BOT_TOKEN, auth_date: int | None = None) -> str:
+    fields = {
+        "auth_date": str(auth_date or int(time.time())),
+        "user": json.dumps(user, separators=(",", ":")),
+    }
+    dcs = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))
+    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    fields["hash"] = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
+    return urlencode(fields)
+
+
+# ─── initData (sempre) ──────────────────────────────────────────────
+
+def test_init_data_valid():
+    idata = make_init_data({"id": 777, "first_name": "Bobbi"})
+    data = validate_init_data(idata, BOT_TOKEN)
+    assert data and data["user"]["id"] == 777
+    assert user_id_from_init_data(idata, BOT_TOKEN) == 777
+
+
+def test_init_data_wrong_token_rejected():
+    idata = make_init_data({"id": 1, "first_name": "X"})
+    assert validate_init_data(idata, "999:WRONG") is None
+
+
+def test_init_data_tampered_rejected():
+    idata = make_init_data({"id": 1, "first_name": "Bobbi"})
+    assert validate_init_data(idata.replace("Bobbi", "Hacker"), BOT_TOKEN) is None
+
+
+def test_init_data_expired_rejected():
+    idata = make_init_data({"id": 1, "first_name": "X"}, auth_date=int(time.time()) - 100000)
+    assert validate_init_data(idata, BOT_TOKEN, max_age_seconds=3600) is None
+
+
+def test_init_data_empty():
+    assert validate_init_data("", BOT_TOKEN) is None
+    assert user_id_from_init_data("", BOT_TOKEN) is None
+
+
+# ─── Revolut client (sempre, con server locale finto) ───────────────
+
+def test_revolut_client_create_and_get():
+    from aiohttp import web
+
+    async def run():
+        seen = {}
+
+        async def create(request):
+            assert request.headers["Authorization"] == "Bearer sk_test"
+            seen["body"] = await request.json()
+            return web.json_response({"id": "6a1b", "token": "tok_pub", "state": "pending"})
+
+        async def get(request):
+            return web.json_response({"id": request.match_info["oid"], "state": "completed"})
+
+        app = web.Application()
+        app.router.add_post("/orders", create)
+        app.router.add_get("/orders/{oid}", get)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "127.0.0.1", 0)
+        await site.start()
+        port = list(runner.addresses)[0][1]
+
+        client = RevolutClient("sk_test", base_url=f"http://127.0.0.1:{port}")
+        order = await client.create_order(amount_minor=3990, currency="EUR", merchant_order_ext_ref="ON-1")
+        assert order["token"] == "tok_pub"
+        assert seen["body"]["amount"] == 3990 and seen["body"]["merchant_order_ext_ref"] == "ON-1"
+
+        got = await client.get_order("6a1b")
+        assert is_paid(got)
+
+        with pytest.raises(RevolutError):
+            await client.create_order(amount_minor=0)
+
+        await runner.cleanup()
+
+    asyncio.run(run())
+
+
+def test_revolut_build_client_none_without_key():
+    from oro_naturale.revolut import build_client
+
+    assert build_client("", "sandbox") is None
+    assert build_client("sk_x", "sandbox") is not None
+
+
+def test_config_reads_revolut_env(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x")
+    monkeypatch.setenv("Revolut_public_api", "pk_123")
+    monkeypatch.setenv("revolut_secret_api", "sk_123")
+    monkeypatch.setenv("REVOLUT_MODE", "prod")
+    from oro_naturale.config import load_settings
+
+    s = load_settings()
+    assert s.revolut_public_key == "pk_123"
+    assert s.revolut_secret_key == "sk_123"
+    assert s.revolut_mode == "prod"
+
+
+# ─── DB + API (si saltano senza Postgres di test) ───────────────────
+
+TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://postgres@127.0.0.1:55432/oro_test")
+
+
+def _db_available() -> bool:
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect(TEST_DB_URL, connect_timeout=2)
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+requires_db = pytest.mark.skipif(not _db_available(), reason="Postgres di test non disponibile")
+
+
+@pytest.fixture()
+def clean_db():
+    import psycopg2
+
+    from oro_naturale import db as dbmod
+
+    dbmod.init_schema(TEST_DB_URL)
+    conn = psycopg2.connect(TEST_DB_URL)
+    cur = conn.cursor()
+    cur.execute("TRUNCATE orders, customers;")
+    conn.commit()
+    conn.close()
+    return TEST_DB_URL
+
+
+@requires_db
+def test_db_order_lifecycle(clean_db):
+    from oro_naturale import db as dbmod
+
+    dbmod.upsert_customer(1, username="bob", first_name="Bobbi", database_url=clean_db)
+    dbmod.upsert_customer(1, phone="+39", city="Perugia", database_url=clean_db)
+    c = dbmod.get_customer(1, database_url=clean_db)
+    assert c["first_name"] == "Bobbi" and c["city"] == "Perugia"
+
+    dbmod.create_order({
+        "id": "ON-X", "user_id": 1, "username": "bob",
+        "items": [{"id": "p1", "name": "Olio", "price": 10.0, "quantity": 2}],
+        "subtotal": 20.0, "shipping": 14, "total": 34.0, "status": "pending",
+    }, database_url=clean_db)
+    o = dbmod.get_order("ON-X", database_url=clean_db)
+    assert o["total"] == 34.0 and o["items"][0]["quantity"] == 2
+
+    dbmod.update_order_status("ON-X", "paid", mark_paid=True, payment_method="apple_pay", database_url=clean_db)
+    o = dbmod.get_order("ON-X", database_url=clean_db)
+    assert o["status"] == "paid" and o["paid_at"] and o["payment_method"] == "apple_pay"
+
+    dbmod.set_tracking("ON-X", carrier="BRT", code="T1", url="https://x", database_url=clean_db)
+    o = dbmod.get_order("ON-X", database_url=clean_db)
+    assert o["tracking_code"] == "T1" and o["status"] == "shipped"
+
+    assert len(dbmod.list_user_orders(1, database_url=clean_db)) == 1
+    assert dbmod.list_user_orders(999, database_url=clean_db) == []
+
+
+@requires_db
+def test_api_full_flow(clean_db, monkeypatch):
+    from aiohttp import web
+    from aiohttp.test_utils import TestClient, TestServer
+
+    import oro_naturale.api as api
+    from oro_naturale.revolut import RevolutClient
+
+    monkeypatch.setenv("DATABASE_URL", clean_db)
+
+    async def run():
+        rev_state = {"state": "pending", "ext": None}
+
+        async def rc(request):
+            b = await request.json()
+            return web.json_response({"id": "rev-" + b["merchant_order_ext_ref"], "token": "tok",
+                                      "state": "pending", "merchant_order_ext_ref": b["merchant_order_ext_ref"]})
+
+        async def rg(request):
+            return web.json_response({"id": request.match_info["oid"], "state": rev_state["state"]})
+
+        revapp = web.Application()
+        revapp.router.add_post("/orders", rc)
+        revapp.router.add_get("/orders/{oid}", rg)
+        revrunner = web.AppRunner(revapp)
+        await revrunner.setup()
+        revsite = web.TCPSite(revrunner, "127.0.0.1", 0)
+        await revsite.start()
+        revport = list(revrunner.addresses)[0][1]
+
+        monkeypatch.setattr(
+            api, "build_client",
+            lambda sk, mode, ver=None: RevolutClient(sk, base_url=f"http://127.0.0.1:{revport}") if sk else None,
+        )
+
+        notifs = []
+
+        class FakeBot:
+            async def send_message(self, cid, text, **kw):
+                notifs.append((cid, text))
+
+        settings = SimpleNamespace(
+            telegram_bot_token=BOT_TOKEN, admin_chat_ids={42},
+            revolut_public_key="pk", revolut_secret_key="sk", revolut_mode="sandbox",
+            revolut_api_version="2024-09-01", stripe_currency="eur",
+            free_shipping_min=100.0, default_shipping=14.0,
+        )
+        ctx = SimpleNamespace(settings=settings, products=[
+            {"id": "p1", "name": "Olio", "price": 12.95, "stock": 100},
+        ])
+
+        client = TestClient(TestServer(api.build_api(ctx, FakeBot())))
+        await client.start_server()
+        H = {"X-Init-Data": make_init_data({"id": 5001, "first_name": "Bobbi", "username": "bob"})}
+        AH = {"X-Init-Data": make_init_data({"id": 42, "first_name": "Admin"})}
+
+        # crea ordine (2×12.95 + 14 = 39.90)
+        r = await client.post("/orders", headers=H, json={
+            "items": [{"id": "p1", "quantity": 2}],
+            "shipping": {"name": "Bobbi", "phone": "+39", "address": "Via Roma 1", "city": "Perugia", "zip": "06100"},
+        })
+        o = await r.json()
+        assert r.status == 200 and o["total"] == 39.90 and o["revolut_token"] == "tok"
+        oid = o["order_id"]
+
+        # prezzo client ignorato
+        r = await client.post("/orders", headers=H, json={"items": [{"id": "p1", "quantity": 1, "price": 0.01}], "shipping": {}})
+        assert (await r.json())["subtotal"] == 12.95
+
+        # senza auth -> 401
+        r = await client.post("/orders", json={"items": [{"id": "p1", "quantity": 1}]})
+        assert r.status == 401
+
+        # confirm non pagato
+        r = await client.post(f"/orders/{oid}/confirm", headers=H, json={})
+        assert (await r.json())["paid"] is False
+
+        # confirm pagato + notifica admin
+        rev_state["state"] = "completed"
+        r = await client.post(f"/orders/{oid}/confirm", headers=H, json={"payment_method": "apple_pay"})
+        body = await r.json()
+        assert body["paid"] is True and body["order"]["status"] == "paid"
+        assert any(cid == 42 and "NUOVO ORDINE" in t for cid, t in notifs)
+
+        # profilo utente
+        r = await client.get("/profile", headers=H)
+        p = await r.json()
+        assert any(x["id"] == oid for x in p["orders"]) and p["customer"]["city"] == "Perugia"
+
+        # isolamento: altro utente non vede l'ordine
+        r = await client.get("/profile", headers={"X-Init-Data": make_init_data({"id": 9, "first_name": "Z"})})
+        assert all(x["id"] != oid for x in (await r.json())["orders"])
+
+        # admin vede tutto; non-admin 403
+        r = await client.get("/admin/orders", headers=AH)
+        assert any(x["id"] == oid for x in (await r.json())["orders"])
+        r = await client.get("/admin/orders", headers=H)
+        assert r.status == 403
+
+        # admin set tracking -> notifica utente
+        notifs.clear()
+        r = await client.post(f"/admin/orders/{oid}/tracking", headers=AH,
+                              json={"carrier": "BRT", "code": "T9", "url": "https://brt.it/T9"})
+        t = await r.json()
+        assert t["order"]["tracking_code"] == "T9" and t["order"]["status"] == "shipped"
+        assert any(cid == 5001 and "spedito" in txt for cid, txt in notifs)
+        r = await client.post(f"/admin/orders/{oid}/tracking", headers=H, json={"carrier": "X", "code": "Y"})
+        assert r.status == 403
+
+        await client.close()
+        await revrunner.cleanup()
+
+    asyncio.run(run())

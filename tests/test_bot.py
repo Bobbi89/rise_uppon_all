@@ -412,3 +412,75 @@ def test_setup_bot_menu_falls_back_without_https():
 
     button = bot.set_chat_menu_button.await_args.kwargs["menu_button"]
     assert isinstance(button, MenuButtonCommands)
+
+
+# ─── /start mini-app-first ──────────────────────────────────────────
+
+def test_webapp_launch_and_gateway_menus():
+    from oro_naturale.keyboards import webapp_gateway_menu, webapp_launch_menu, BTN_WEBAPP
+
+    launch = webapp_launch_menu("https://shop.example")
+    # Un solo pulsante: "Apri il Negozio", nessun altro
+    assert len(launch.keyboard) == 1 and len(launch.keyboard[0]) == 1
+    assert launch.keyboard[0][0].text == BTN_WEBAPP
+    assert launch.keyboard[0][0].web_app.url == "https://shop.example"
+
+    gateway = webapp_gateway_menu("https://shop.example")
+    assert gateway.inline_keyboard[0][0].web_app.url == "https://shop.example"
+    # gateway = un solo pulsante, quello del marketplace
+    assert len(gateway.inline_keyboard) == 1
+
+
+def _run_start(webapp_url, monkeypatch, tmp_path):
+    import asyncio
+    from types import SimpleNamespace
+
+    import oro_naturale.routers.public as pub
+    from oro_naturale.context import BotContext
+
+    settings = SimpleNamespace(
+        webapp_url=webapp_url, admin_chat_ids=set(), default_shipping=14.0,
+        free_shipping_min=100.0, b2b_discount=15.0, followup_hours=24.0,
+        stripe_secret_key="", stripe_currency="eur",
+    )
+    ctx = BotContext(settings=settings, store=FileStore(tmp_path))  # type: ignore[arg-type]
+
+    sent = []
+
+    async def fake_send(target, text, **kwargs):
+        sent.append({"text": text, "markup": kwargs.get("reply_markup")})
+
+    monkeypatch.setattr(pub, "safe_send_message", fake_send)
+    router = pub.build_public_router(ctx)
+    handler = next(h.callback for h in router.message.handlers if h.callback.__name__ == "start")
+    message = SimpleNamespace(
+        from_user=SimpleNamespace(id=1, username="u"),
+        chat=SimpleNamespace(id=1),
+    )
+    asyncio.run(handler(message))
+    return sent
+
+
+def test_start_redirects_to_miniapp_when_webapp_set(monkeypatch, tmp_path):
+    from aiogram.types import InlineKeyboardMarkup
+
+    sent = _run_start("https://shop.example", monkeypatch, tmp_path)
+    # Deve comparire il pulsante-gateway inline che apre la Mini App
+    gateway = [m for m in sent if isinstance(m["markup"], InlineKeyboardMarkup)]
+    assert gateway, "atteso un messaggio con pulsante inline web_app"
+    btn = gateway[-1]["markup"].inline_keyboard[0][0]
+    assert btn.web_app is not None and btn.web_app.url == "https://shop.example"
+    # Non deve proporre lo shop testuale (categorie) su /start
+    assert not any("categoria" in m["text"].lower() for m in sent)
+
+
+def test_start_falls_back_to_text_shop_without_webapp(monkeypatch, tmp_path):
+    from aiogram.types import InlineKeyboardMarkup
+
+    sent = _run_start("", monkeypatch, tmp_path)
+    # Nessun pulsante web_app; usa il menu testuale
+    for m in sent:
+        if isinstance(m["markup"], InlineKeyboardMarkup):
+            for row in m["markup"].inline_keyboard:
+                for b in row:
+                    assert b.web_app is None

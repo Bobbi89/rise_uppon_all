@@ -1,10 +1,9 @@
 import { CheckCircle2 } from "lucide-react";
-import type { Order } from "../types";
 import { formatMoney } from "../utils/money";
 import { Sheet } from "./Sheet";
 
 type Props = {
-  order: Order | null;
+  order: { id: string; total: number; paid: boolean } | null;
   onClose: () => void;
 };
 
@@ -17,8 +16,12 @@ export function SuccessSheet({ order, onClose }: Props) {
           <h3 className="mt-3 font-display text-2xl font-semibold text-olive-900">Grazie!</h3>
           <p className="mt-2 text-sm leading-6 text-olive-700">
             Il tuo ordine <span className="font-extrabold text-olive-900">{order.id}</span> da{" "}
-            <span className="font-extrabold text-olive-900">{formatMoney(order.total)}</span> è stato
-            registrato. Ti contatteremo in chat con la conferma e le istruzioni di pagamento.
+            <span className="font-extrabold text-olive-900">{formatMoney(order.total)}</span>{" "}
+            {order.paid ? (
+              <>è stato <b>pagato</b> con successo. Lo trovi in “I miei ordini” con lo stato e il tracking.</>
+            ) : (
+              <>è stato registrato. Ti contatteremo per completare il pagamento.</>
+            )}
           </p>
           <div className="safe-bottom mt-6">
             <button

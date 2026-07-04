@@ -45,7 +45,7 @@ export type Order = {
   trackingUrl?: string;
 };
 
-export type PaymentMethod = "stripe" | "revolut" | "bonifico";
+export type PaymentMethod = "revolut" | "revolut_pay" | "apple_pay" | "card";
 
 export type ShippingDetails = {
   name: string;
@@ -54,4 +54,30 @@ export type ShippingDetails = {
   city: string;
   zip: string;
   notes?: string;
+};
+
+/** Ordine come restituito dall'API/DB (profilo utente e admin). */
+export type ServerOrder = {
+  id: string;
+  user_id?: number;
+  username?: string;
+  items: { id: string; name: string; price: number; quantity: number }[];
+  subtotal: number;
+  shipping: number;
+  total: number;
+  currency: string;
+  status: string;
+  payment_method?: string | null;
+  shipping_name?: string | null;
+  shipping_phone?: string | null;
+  shipping_address?: string | null;
+  shipping_city?: string | null;
+  shipping_zip?: string | null;
+  shipping_notes?: string | null;
+  tracking_carrier?: string | null;
+  tracking_code?: string | null;
+  tracking_url?: string | null;
+  tracking_status?: string | null;
+  created_at?: string;
+  paid_at?: string | null;
 };
