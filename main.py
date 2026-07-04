@@ -48,7 +48,7 @@ async def setup_bot_menu(bot: Bot, webapp_url: str) -> None:
         if webapp_url.startswith("https://"):
             await bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
-                    text="🌿 Negozio",
+                    text="Apri il Negozio",
                     web_app=WebAppInfo(url=webapp_url),
                 )
             )

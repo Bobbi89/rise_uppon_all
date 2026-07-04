@@ -215,8 +215,8 @@ def build_public_router(ctx: BotContext) -> Router:
             await safe_send_message(
                 message,
                 "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
-                "Il nostro marketplace di prodotti biologici è qui, dentro Telegram.\n"
-                "👇 Tocca <b>Apri il Marketplace</b> per entrare.",
+                "Il nostro negozio di prodotti biologici è qui, dentro Telegram.\n"
+                "👇 Tocca <b>Apri il Negozio</b> per entrare.",
                 reply_markup=webapp_launch_menu(ctx.settings.webapp_url),
             )
             await safe_send_message(

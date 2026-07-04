@@ -420,6 +420,8 @@ def test_webapp_launch_and_gateway_menus():
     from oro_naturale.keyboards import webapp_gateway_menu, webapp_launch_menu, BTN_WEBAPP
 
     launch = webapp_launch_menu("https://shop.example")
+    # Un solo pulsante: "Apri il Negozio", nessun altro
+    assert len(launch.keyboard) == 1 and len(launch.keyboard[0]) == 1
     assert launch.keyboard[0][0].text == BTN_WEBAPP
     assert launch.keyboard[0][0].web_app.url == "https://shop.example"
 

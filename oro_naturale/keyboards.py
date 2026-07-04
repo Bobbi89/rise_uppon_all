@@ -90,7 +90,7 @@ BTN_PROFILO    = "👤 Profilo"
 BTN_NEGOZIO    = "📍 Negozio"
 BTN_SUPPORTO   = "🎧 Supporto"
 BTN_MENU       = "🔙 Menu principale"
-BTN_WEBAPP     = "🛒 Apri il Marketplace"
+BTN_WEBAPP     = "🛒 Apri il Negozio"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -152,14 +152,12 @@ def main_menu(cart_count: int = 0, webapp_url: str | None = None) -> ReplyKeyboa
 
 def webapp_launch_menu(webapp_url: str) -> ReplyKeyboardMarkup:
     """
-    Tastiera persistente minimale per l'esperienza "mini-app-first": un solo
-    grande pulsante che apre la Mini App, così l'utente entra nel marketplace
-    invece che nello shop testuale in chat.
+    Tastiera persistente con UN SOLO pulsante: apre il Negozio (Mini App).
+    Nessun altro pulsante, così l'utente entra direttamente nel negozio.
     """
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url))],
-            [KeyboardButton(text=BTN_ORDINI), KeyboardButton(text=BTN_SUPPORTO)],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -167,9 +165,9 @@ def webapp_launch_menu(webapp_url: str) -> ReplyKeyboardMarkup:
 
 
 def webapp_gateway_menu(webapp_url: str) -> InlineKeyboardMarkup:
-    """Messaggio-gateway: unico pulsante inline che apre la Mini App a schermo intero."""
+    """Messaggio-gateway: unico pulsante inline che apre il Negozio a schermo intero."""
     return _ikb(
-        [InlineKeyboardButton(text="🛒 Apri il Marketplace", web_app=WebAppInfo(url=webapp_url))],
+        [InlineKeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url))],
     )
 
 
@@ -185,7 +183,7 @@ def welcome_menu(webapp_url: str | None = None) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if webapp_url:
         rows.append([
-            InlineKeyboardButton(text="🛒 Apri il Marketplace", web_app=WebAppInfo(url=webapp_url)),
+            InlineKeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url)),
         ])
     else:
         rows.append([_btn("🛍️ Apri Catalogo Prodotti", "show_categories")])

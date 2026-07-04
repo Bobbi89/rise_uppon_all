@@ -143,14 +143,19 @@ export default function App() {
           </div>
         ) : (
           <div className="mt-3 grid grid-cols-2 gap-2.5 min-[480px]:grid-cols-3">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAdd={(item) => addToCart(item, 1)}
-                onView={setSelectedProduct}
-              />
-            ))}
+            {filteredProducts.map((product) => {
+              const inCart = cart.find((item) => item.product.id === product.id)?.quantity ?? 0;
+              return (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  quantity={inCart}
+                  onAdd={(item) => addToCart(item, 1)}
+                  onDecrement={(item) => updateCart(item.id, inCart - 1)}
+                  onView={setSelectedProduct}
+                />
+              );
+            })}
           </div>
         )}
 
