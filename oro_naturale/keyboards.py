@@ -150,6 +150,29 @@ def main_menu(cart_count: int = 0, webapp_url: str | None = None) -> ReplyKeyboa
     )
 
 
+def webapp_launch_menu(webapp_url: str) -> ReplyKeyboardMarkup:
+    """
+    Tastiera persistente minimale per l'esperienza "mini-app-first": un solo
+    grande pulsante che apre la Mini App, così l'utente entra nel marketplace
+    invece che nello shop testuale in chat.
+    """
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_WEBAPP, web_app=WebAppInfo(url=webapp_url))],
+            [KeyboardButton(text=BTN_ORDINI), KeyboardButton(text=BTN_SUPPORTO)],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
+
+
+def webapp_gateway_menu(webapp_url: str) -> InlineKeyboardMarkup:
+    """Messaggio-gateway: unico pulsante inline che apre la Mini App a schermo intero."""
+    return _ikb(
+        [InlineKeyboardButton(text="🛒 Apri il Marketplace", web_app=WebAppInfo(url=webapp_url))],
+    )
+
+
 def welcome_menu(webapp_url: str | None = None) -> InlineKeyboardMarkup:
     """
     Inline keyboard nel messaggio di benvenuto (screen 01).
