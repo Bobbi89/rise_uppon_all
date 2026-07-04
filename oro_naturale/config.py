@@ -67,13 +67,29 @@ def _resolve_webapp_url() -> str:
     """
     explicit = os.getenv("WEBAPP_URL", "").strip()
     if explicit:
-        return explicit.rstrip("/")
+        return _normalize_https(explicit)
 
     railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
     if railway_domain:
-        return f"https://{railway_domain}"
+        return _normalize_https(railway_domain)
 
     return ""
+
+
+def _normalize_https(url: str) -> str:
+    """
+    Normalizza un URL/dominio a forma https:// (Telegram accetta solo HTTPS
+    per i pulsanti Web App). Aggiunge lo schema se manca, forza http→https,
+    e rimuove lo slash finale.
+    """
+    url = url.strip().rstrip("/")
+    if not url:
+        return ""
+    if url.startswith("http://"):
+        url = "https://" + url[len("http://"):]
+    elif not url.startswith("https://"):
+        url = "https://" + url
+    return url
 
 
 def _resolve_web_port() -> int | None:
