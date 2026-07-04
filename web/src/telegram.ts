@@ -26,6 +26,8 @@ type TelegramWebApp = {
   };
   showAlert(message: string): void;
   sendData(data: string): void;
+  openLink(url: string, options?: { try_instant_view?: boolean }): void;
+  initData?: string;
   initDataUnsafe?: {
     user?: {
       id: number;
@@ -71,4 +73,13 @@ export function telegramUserName(): string | null {
   const user = getTelegram()?.initDataUnsafe?.user;
   if (!user) return null;
   return [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || null;
+}
+
+/** initData firmato da Telegram: autentica l'utente verso l'API. */
+export function telegramInitData(): string {
+  return getTelegram()?.initData ?? "";
+}
+
+export function hapticError(): void {
+  getTelegram()?.HapticFeedback?.notificationOccurred("error");
 }

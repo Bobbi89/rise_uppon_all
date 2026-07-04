@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
+import { api, type ApiConfig } from "./api";
+import { AdminSheet } from "./components/AdminSheet";
 import { CartSheet } from "./components/CartSheet";
 import { CategoryChips } from "./components/CategoryChips";
 import { CheckoutSheet } from "./components/CheckoutSheet";
 import { Header } from "./components/Header";
 import { ProductCard } from "./components/ProductCard";
 import { ProductSheet } from "./components/ProductSheet";
+import { ProfileSheet } from "./components/ProfileSheet";
 import { SuccessSheet } from "./components/SuccessSheet";
 import { products } from "./data/products";
-import { getTelegram, haptic, hapticSuccess, initTelegram, telegramUserName } from "./telegram";
-import type { CartItem, CategoryFilter, Order, PaymentMethod, Product, ShippingDetails } from "./types";
+import { payWithRevolut } from "./revolut";
+import { haptic, hapticError, hapticSuccess, initTelegram, telegramUserName } from "./telegram";
+import type { CartItem, CategoryFilter, Product, ShippingDetails } from "./types";
 import { formatMoney } from "./utils/money";
 
-const FREE_SHIPPING_MIN = 100;
-const DEFAULT_SHIPPING = 14;
+const DEFAULTS = { free_shipping_min: 100, default_shipping: 14 };
 
 export default function App() {
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -21,11 +24,21 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; total: number; paid: boolean } | null>(null);
+
+  const [config, setConfig] = useState<ApiConfig | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     initTelegram();
+    api.getConfig().then(setConfig).catch(() => setConfig(null));
   }, []);
+
+  const freeShippingMin = config?.free_shipping_min ?? DEFAULTS.free_shipping_min;
+  const defaultShipping = config?.default_shipping ?? DEFAULTS.default_shipping;
 
   const filteredProducts = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -40,7 +53,7 @@ export default function App() {
   }, [category, query]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shipping = cart.length === 0 || subtotal >= FREE_SHIPPING_MIN ? 0 : DEFAULT_SHIPPING;
+  const shipping = cart.length === 0 || subtotal >= freeShippingMin ? 0 : defaultShipping;
   const total = subtotal + shipping;
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -69,56 +82,69 @@ export default function App() {
     );
   }
 
-  function confirmOrder(details: ShippingDetails, method: PaymentMethod) {
-    const order: Order = {
-      id: `ON-${Math.floor(10000 + Math.random() * 89999)}`,
-      date: new Date().toISOString().slice(0, 10),
-      status: "da pagare",
-      total,
-      items: cart,
-    };
+  // Flusso pagamento: crea ordine (server) → paga con Revolut → conferma.
+  async function pay(details: ShippingDetails) {
+    if (processing) return;
+    setProcessing(true);
+    setCheckoutError(null);
+    try {
+      const items = cart.map((item) => ({ id: item.product.id, quantity: item.quantity }));
+      const created = await api.createOrder(items, details);
 
-    hapticSuccess();
-    setCheckoutOpen(false);
-    setCart([]);
-
-    // Se la mini app è stata aperta dal pulsante keyboard del bot,
-    // l'ordine arriva al bot via web_app_data e Telegram chiude la webapp.
-    const tg = getTelegram();
-    if (tg) {
-      try {
-        tg.sendData(
-          JSON.stringify({
-            type: "order",
-            order_id: order.id,
-            total,
-            shipping,
-            payment_method: method,
-            customer: details,
-            items: cart.map((item) => ({
-              id: item.product.id,
-              name: item.product.name,
-              price: item.product.price,
-              quantity: item.quantity,
-            })),
-          }),
-        );
-      } catch {
-        // aperta come link diretto: sendData non disponibile
+      if (!created.revolut_token) {
+        // Revolut non configurato: ordine registrato come "da pagare".
+        hapticSuccess();
+        finishOrder(created.order_id, created.total, false);
+        return;
       }
+
+      const outcome = await payWithRevolut(created.revolut_token, created.revolut_mode);
+      if (outcome === "cancel") {
+        setProcessing(false);
+        return; // l'utente ha annullato: resta nel checkout
+      }
+
+      const confirmation = await api.confirmOrder(created.order_id, "revolut");
+      if (confirmation.paid) {
+        hapticSuccess();
+        finishOrder(created.order_id, created.total, true);
+      } else {
+        hapticError();
+        setCheckoutError("Pagamento non confermato. Riprova o contattaci.");
+        setProcessing(false);
+      }
+    } catch (e) {
+      hapticError();
+      setCheckoutError((e as Error).message || "Errore durante il pagamento.");
+      setProcessing(false);
     }
-    setConfirmedOrder(order);
   }
 
-  const overlayOpen = selectedProduct !== null || cartOpen || checkoutOpen || confirmedOrder !== null;
+  function finishOrder(id: string, orderTotal: number, paid: boolean) {
+    setProcessing(false);
+    setCheckoutOpen(false);
+    setCart([]);
+    setConfirmedOrder({ id, total: orderTotal, paid });
+  }
+
+  const overlayOpen =
+    selectedProduct !== null ||
+    cartOpen ||
+    checkoutOpen ||
+    profileOpen ||
+    adminOpen ||
+    confirmedOrder !== null;
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg bg-cream font-body text-olive-900">
       <Header
         cartCount={cartCount}
         query={query}
+        isAdmin={config?.is_admin ?? false}
         onQuery={setQuery}
         onOpenCart={() => setCartOpen(true)}
+        onOpenProfile={() => setProfileOpen(true)}
+        onOpenAdmin={() => setAdminOpen(true)}
       />
 
       <main className="px-4 pb-28 pt-3">
@@ -131,7 +157,7 @@ export default function App() {
         />
 
         <p className="mt-2 text-[12px] font-semibold text-olive-400">
-          {filteredProducts.length} prodotti · Spedizione gratis da {formatMoney(FREE_SHIPPING_MIN)}
+          {filteredProducts.length} prodotti · Spedizione gratis da {formatMoney(freeShippingMin)}
         </p>
 
         {filteredProducts.length === 0 ? (
@@ -186,11 +212,12 @@ export default function App() {
         subtotal={subtotal}
         shipping={shipping}
         total={total}
-        freeShippingMin={FREE_SHIPPING_MIN}
+        freeShippingMin={freeShippingMin}
         onClose={() => setCartOpen(false)}
         onUpdate={updateCart}
         onCheckout={() => {
           setCartOpen(false);
+          setCheckoutError(null);
           setCheckoutOpen(true);
         }}
       />
@@ -200,9 +227,17 @@ export default function App() {
         items={cart}
         total={total}
         defaultName={telegramUserName() ?? undefined}
-        onClose={() => setCheckoutOpen(false)}
-        onConfirm={confirmOrder}
+        processing={processing}
+        error={checkoutError}
+        revolutEnabled={config?.revolut_enabled ?? false}
+        onClose={() => {
+          if (!processing) setCheckoutOpen(false);
+        }}
+        onPay={pay}
       />
+
+      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <AdminSheet open={adminOpen} onClose={() => setAdminOpen(false)} />
 
       <SuccessSheet order={confirmedOrder} onClose={() => setConfirmedOrder(null)} />
     </div>

@@ -217,6 +217,15 @@ async def main() -> None:
     print("🔄 Avvio migrazione prodotti da JSON a PostgreSQL...")
     migrate_products()
 
+    # 1b. Schema ordini/clienti (Mini App)
+    if os.environ.get("DATABASE_URL"):
+        try:
+            from oro_naturale import db as _db
+            _db.init_schema()
+            print("✅ Schema ordini/clienti verificato/creato.")
+        except Exception as e:
+            print(f"❌ Errore schema ordini/clienti: {e}")
+
     # 2. Caricamento impostazioni e contesto
     settings = load_settings()
     store = FileStore(settings.data_dir)
@@ -247,8 +256,8 @@ async def main() -> None:
     # Web server della Mini App (se Railway/host fornisce una PORT)
     web_runner = None
     if settings.web_port:
-        web_runner = await start_web_server(settings.web_port)
-        print(f"🌐 Mini App in ascolto su porta {settings.web_port}")
+        web_runner = await start_web_server(settings.web_port, ctx=ctx, bot=bot)
+        print(f"🌐 Mini App + API in ascolto su porta {settings.web_port}")
     else:
         print("ℹ️ Nessuna PORT: la Mini App non viene servita da questo processo.")
 

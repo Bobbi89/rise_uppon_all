@@ -44,10 +44,15 @@ async def _health(_request: web.Request) -> web.StreamResponse:
     return web.json_response({"status": "ok", "dist": WEB_DIST.exists()})
 
 
-def build_web_app() -> web.Application:
+def build_web_app(ctx: object | None = None, bot: object | None = None) -> web.Application:
     app = web.Application()
     app.router.add_get("/", _index)
     app.router.add_get("/health", _health)
+
+    # API della Mini App (ordini, pagamenti Revolut, profilo, admin)
+    if ctx is not None:
+        from .api import build_api
+        app.add_subapp("/api", build_api(ctx, bot))
 
     assets = WEB_DIST / "assets"
     if assets.exists():
@@ -58,9 +63,9 @@ def build_web_app() -> web.Application:
     return app
 
 
-async def start_web_server(port: int) -> web.AppRunner:
-    """Avvia il server statico su 0.0.0.0:port e ritorna il runner (per lo shutdown)."""
-    runner = web.AppRunner(build_web_app())
+async def start_web_server(port: int, ctx: object | None = None, bot: object | None = None) -> web.AppRunner:
+    """Avvia il server (static + API) su 0.0.0.0:port e ritorna il runner (per lo shutdown)."""
+    runner = web.AppRunner(build_web_app(ctx, bot))
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
