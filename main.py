@@ -237,6 +237,15 @@ async def main() -> None:
     ctx.reload_products(db_products + ctx.custom_products)
     print(f"📦 Caricati {len(db_products)} prodotti dal database.")
 
+    # 3b. Stato pagamenti Revolut (senza esporre le chiavi)
+    if settings.revolut_secret_key and settings.revolut_public_key:
+        host = "merchant.revolut.com" if settings.revolut_mode == "prod" else "sandbox-merchant.revolut.com"
+        print(f"💳 Revolut ATTIVO — modalità: {settings.revolut_mode.upper()} → {host}")
+        if settings.revolut_mode != "prod":
+            print("⚠️  Con chiavi di PRODUZIONE imposta REVOLUT_MODE=prod, altrimenti Revolut rifiuta l'auth.")
+    else:
+        print("💳 Revolut NON configurato (mancano REVOLUT_PUBLIC_API / REVOLUT_SECRET_API).")
+
     # 4. Inizializzazione bot e dispatcher
     bot = Bot(
         token=settings.telegram_bot_token,
