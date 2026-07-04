@@ -210,14 +210,19 @@ def build_public_router(ctx: BotContext) -> Router:
         await safe_send_message(
             message,
             "🌿 <b>Benvenuto in Oro Naturale</b>\n\n"
-            "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.\n\n"
-            "Usa il menu qui sotto per navigare il catalogo, "
-            "gestire il carrello e completare i tuoi ordini.",
+            "Oli EVO, vini, cosmetici e confezioni regalo dall'Umbria.",
             reply_markup=main_menu(count, ctx.settings.webapp_url),
         )
+        if ctx.settings.webapp_url.startswith("https://"):
+            welcome_text = (
+                "👇 <b>Tocca “Apri il Marketplace”</b> per sfogliare i prodotti "
+                "in griglia, aggiungerli al carrello e ordinare in pochi tap."
+            )
+        else:
+            welcome_text = "Cosa vuoi fare oggi?"
         await safe_send_message(
             message,
-            "Cosa vuoi fare oggi?",
+            welcome_text,
             reply_markup=welcome_menu(ctx.settings.webapp_url),
         )
 
