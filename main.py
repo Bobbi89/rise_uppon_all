@@ -270,6 +270,18 @@ async def main() -> None:
     else:
         print("ℹ️ Nessuna PORT: la Mini App non viene servita da questo processo.")
 
+    # Stato Mini App: se non c'è un URL HTTPS, il bot usa il vecchio shop testuale
+    if settings.webapp_url.startswith("https://"):
+        print(f"🛒 Mini App ATTIVA → {settings.webapp_url}")
+    else:
+        print(
+            "⚠️  Mini App DISATTIVA: nessun WEBAPP_URL HTTPS.\n"
+            "    Il bot mostra il catalogo/carrello testuale in chat.\n"
+            "    Fix: imposta WEBAPP_URL sul dominio pubblico Railway "
+            "(es. https://<servizio>.up.railway.app). L'auto-rilevamento da "
+            "RAILWAY_PUBLIC_DOMAIN funziona solo se il servizio ha un dominio pubblico."
+        )
+
     # Comandi + pulsante Mini App su Telegram
     await setup_bot_menu(bot, settings.webapp_url)
 
