@@ -16,7 +16,6 @@ from ..catalog import (
     find_products,
     format_product,
     format_products,
-    group_by_category,
     product_key,
     recommendations_for,
 )
@@ -32,14 +31,12 @@ from ..keyboards import (
     BTN_PROFILO,
     BTN_SUPPORTO,
     # Formatters testo
-    format_cart_summary,
     format_favorites_empty,
     format_favorites_header,
     format_order_confirmed,
     format_order_detail,
     format_orders_header,
     format_profile,
-    format_review_request,
     format_search_empty,
     format_search_header,
     format_store_info,
@@ -58,7 +55,6 @@ from ..keyboards import (
     product_card_menu,
     profile_menu,
     quantity_menu,
-    review_menu,
     search_no_results_menu,
     search_results_menu,
     shipping_menu,
@@ -66,7 +62,6 @@ from ..keyboards import (
     support_menu,
     tracking_menu,
     welcome_menu,
-    ORDER_STATUS_EMOJI,
 )
 from ..services import (
     create_stripe_link,
@@ -77,7 +72,6 @@ from ..services import (
     format_company,
     format_payments,
     natural_business_reply,
-    parse_total,
     process_order_payload,
     recommend_upsell,
 )
@@ -108,7 +102,7 @@ async def safe_send_message(
                     parse_mode=parse_mode,
                     reply_markup=reply_markup,
                 )
-        except TelegramNetworkError as e:
+        except TelegramNetworkError:
             if attempt == max_retries - 1:
                 raise  # ultimo tentativo, rilancio
             wait = base_delay * (2 ** attempt)
@@ -268,10 +262,8 @@ def build_public_router(ctx: BotContext) -> Router:
         )
         await callback.answer()
 
-    @router.callback_query(F.data.startswith("cat:"))
-    async def cb_category(callback: CallbackQuery) -> None:
-        category_name = callback.data.split(":", 1)[1]
-
+    async def send_category(callback: CallbackQuery, category_name: str, page: int = 0) -> None:
+        """Invia i prodotti di una categoria (10 per pagina)."""
         if category_name == "featured":
             products = [p for p in ctx.products if getattr(p, "featured", False)]
         else:
@@ -281,11 +273,15 @@ def build_public_router(ctx: BotContext) -> Router:
             await callback.answer("Nessun prodotto in questa categoria.", show_alert=True)
             return
 
+        page_items = products[page * 10 : (page + 1) * 10]
+        if not page_items:
+            page, page_items = 0, products[:10]
+
         await safe_send_message(
             callback,
             f"<b>{category_label(category_name)}</b> — {len(products)} prodotti",
         )
-        for product in products[:10]:
+        for product in page_items:
             key     = product_key(product)
             caption = format_product(product)
             stock   = int(getattr(product, "stock", 99))
@@ -294,14 +290,20 @@ def build_public_router(ctx: BotContext) -> Router:
 
             kb = product_card_menu(key, category_name, stock, is_fav)
 
+            sent = False
             if product.image_url:
-                await callback.message.answer_photo(
-                    photo=product.image_url,
-                    caption=caption,
-                    parse_mode="HTML",
-                    reply_markup=kb,
-                )
-            else:
+                try:
+                    await callback.message.answer_photo(
+                        photo=product.image_url,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                    )
+                    sent = True
+                except Exception:
+                    # URL immagine non valido/scaduto: fallback su testo
+                    sent = False
+            if not sent:
                 await safe_send_message(
                     callback,
                     caption,
@@ -309,21 +311,20 @@ def build_public_router(ctx: BotContext) -> Router:
                 )
         await callback.answer()
 
+    @router.callback_query(F.data.startswith("cat:"))
+    async def cb_category(callback: CallbackQuery) -> None:
+        await send_category(callback, callback.data.split(":", 1)[1])
+
     @router.callback_query(F.data.startswith("cat_page:"))
     async def cb_cat_page(callback: CallbackQuery) -> None:
         # cat_page:<category>:<page>
-        parts         = callback.data.split(":", 2)
-        category_name = parts[1]
-        page          = int(parts[2]) if len(parts) > 2 else 0
-        # Reindirizza al handler categoria con la pagina corretta
-        # (implementazione semplificata: richiama la categoria)
-        await cb_category(callback)
+        parts = callback.data.split(":", 2)
+        page  = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+        await send_category(callback, parts[1], page)
 
     @router.callback_query(F.data.startswith("back_cat:"))
     async def cb_back_cat(callback: CallbackQuery) -> None:
-        category_name      = callback.data.split(":", 1)[1]
-        callback.data      = f"cat:{category_name}"
-        await cb_category(callback)
+        await send_category(callback, callback.data.split(":", 1)[1])
 
     @router.callback_query(F.data.startswith("prod:"))
     async def cb_product(callback: CallbackQuery) -> None:
@@ -339,14 +340,19 @@ def build_public_router(ctx: BotContext) -> Router:
         caption = format_product(product)
         kb      = product_card_menu(pid, product.category or "", stock, is_fav)
 
+        sent = False
         if product.image_url:
-            await callback.message.answer_photo(
-                photo=product.image_url,
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=kb,
-            )
-        else:
+            try:
+                await callback.message.answer_photo(
+                    photo=product.image_url,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=kb,
+                )
+                sent = True
+            except Exception:
+                sent = False
+        if not sent:
             await safe_send_message(
                 callback,
                 caption,
@@ -596,7 +602,7 @@ def build_public_router(ctx: BotContext) -> Router:
         await safe_send_message(
             callback,
             "📦 <b>Spedizione</b>\n\nScegli come vuoi ricevere il tuo ordine:",
-            reply_markup=shipping_menu(),
+            reply_markup=shipping_menu(float(ctx.settings.default_shipping)),
         )
         await callback.answer()
 
@@ -668,7 +674,7 @@ def build_public_router(ctx: BotContext) -> Router:
         total = checkout.get("total", 0.0)
 
         # Genera order_id
-        import hashlib, datetime
+        import hashlib
         ts       = int(time.time())
         order_id = hashlib.sha1(
             f"{user_id}{ts}".encode()

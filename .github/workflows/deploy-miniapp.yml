@@ -1,0 +1,44 @@
+name: Deploy Mini App su GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+      - claude/telegram-organic-marketplace-6siktx
+    paths:
+      - "web/**"
+      - "deploy/**"
+      - ".github/workflows/deploy-miniapp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Mini App
+        working-directory: web
+        run: |
+          npm ci
+          npx vite build --config vite.single.config.js
+
+      - name: Prepara sito statico
+        run: |
+          mkdir -p _site
+          cp web/dist-single/index.html _site/index.html
+          touch _site/.nojekyll
+
+      - name: Pubblica su branch gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: _site
+          force_orphan: true

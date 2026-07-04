@@ -10,11 +10,9 @@ from aiogram.types import CallbackQuery, Message
 from ..context import BotContext
 from ..keyboards import (
     admin_dashboard_menu,
-    admin_new_order_menu,
     admin_order_actions_menu,
     admin_orders_menu,
     format_admin_dashboard,
-    main_menu,
 )
 from ..models import Product
 from ..services import format_company, format_payments, is_admin_user
@@ -452,11 +450,17 @@ def build_admin_router(ctx: BotContext) -> Router:
         if len(parts) < 4:
             await message.answer("Uso: /product_add <nome>|<prezzo>|<categoria>|<descrizione>|[image_url]")
             return
+        try:
+            price = float(parts[1].replace(",", "."))
+        except ValueError:
+            await message.answer("Prezzo non valido. Usa un numero, es. 12.95")
+            return
         image_url = parts[4] if len(parts) > 4 else ""
         ctx.custom_products.append(
             Product(
+                id=f"custom-{int(time.time())}",
                 name=parts[0],
-                price=parts[1],
+                price=price,
                 category=parts[2],
                 description=parts[3],
                 image_url=image_url,

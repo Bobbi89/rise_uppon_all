@@ -36,6 +36,7 @@ class Settings:
 
     # Mini App Telegram (webapp del marketplace)
     webapp_url: str           # URL HTTPS della mini app; vuoto = pulsante nascosto
+    web_port: int | None      # Porta HTTP su cui servire la mini app (Railway $PORT)
 
 
 def _parse_admin_ids(value: str) -> set[int]:
@@ -46,6 +47,35 @@ def _parse_admin_ids(value: str) -> set[int]:
         if raw.lstrip("-").isdigit():  # Supporta ID negativi se necessario
             ids.add(int(raw))
     return ids
+
+
+def _resolve_webapp_url() -> str:
+    """
+    URL pubblico della Mini App.
+
+    Priorità:
+      1. WEBAPP_URL esplicita (qualunque hosting)
+      2. dominio pubblico Railway del servizio (RAILWAY_PUBLIC_DOMAIN),
+         così la mini app servita dallo stesso processo è raggiungibile
+         senza configurazione manuale.
+    """
+    explicit = os.getenv("WEBAPP_URL", "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+
+    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+    if railway_domain:
+        return f"https://{railway_domain}"
+
+    return ""
+
+
+def _resolve_web_port() -> int | None:
+    """Porta HTTP per servire la mini app. Railway inietta PORT automaticamente."""
+    raw = os.getenv("PORT", "").strip()
+    if raw.isdigit():
+        return int(raw)
+    return None
 
 
 def load_settings() -> Settings:
@@ -76,5 +106,6 @@ def load_settings() -> Settings:
         followup_hours=float(os.getenv("FOLLOWUP_HOURS", "24")),
 
         # Mini App
-        webapp_url=os.getenv("WEBAPP_URL", "").strip(),
+        webapp_url=_resolve_webapp_url(),
+        web_port=_resolve_web_port(),
     )
