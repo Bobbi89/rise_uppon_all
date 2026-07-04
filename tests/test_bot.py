@@ -320,3 +320,95 @@ def test_webapp_order_handler_invalid_json(tmp_path, monkeypatch):
 
     assert store.tail_jsonl("orders.jsonl", 5) == []
     assert any("non validi" in s for s in sends)
+
+
+# ─── config: risoluzione WEBAPP_URL / PORT ──────────────────────────
+
+def test_resolve_webapp_url_priority(monkeypatch):
+    from oro_naturale.config import _resolve_webapp_url
+
+    monkeypatch.delenv("WEBAPP_URL", raising=False)
+    monkeypatch.delenv("RAILWAY_PUBLIC_DOMAIN", raising=False)
+    assert _resolve_webapp_url() == ""
+
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "shop.up.railway.app")
+    assert _resolve_webapp_url() == "https://shop.up.railway.app"
+
+    monkeypatch.setenv("WEBAPP_URL", "https://custom.example/")
+    assert _resolve_webapp_url() == "https://custom.example"  # esplicita vince, senza slash finale
+
+
+def test_resolve_web_port(monkeypatch):
+    from oro_naturale.config import _resolve_web_port
+
+    monkeypatch.delenv("PORT", raising=False)
+    assert _resolve_web_port() is None
+    monkeypatch.setenv("PORT", "8080")
+    assert _resolve_web_port() == 8080
+    monkeypatch.setenv("PORT", "not-a-number")
+    assert _resolve_web_port() is None
+
+
+# ─── web server della Mini App ──────────────────────────────────────
+
+def test_webserver_serves_index_and_health():
+    import asyncio
+
+    async def run():
+        from aiohttp.test_utils import TestClient, TestServer
+        from oro_naturale.webserver import build_web_app
+
+        client = TestClient(TestServer(build_web_app()))
+        await client.start_server()
+        try:
+            r = await client.get("/health")
+            assert r.status == 200
+            body = await r.json()
+            assert body["status"] == "ok"
+
+            r2 = await client.get("/")
+            # 200 se web/dist è compilato, 503 con messaggio altrimenti
+            assert r2.status in (200, 503)
+
+            # SPA fallback non deve dare 404
+            r3 = await client.get("/percorso/inesistente")
+            assert r3.status in (200, 503)
+        finally:
+            await client.close()
+
+    asyncio.run(run())
+
+
+# ─── setup menu / pulsante Mini App ─────────────────────────────────
+
+def test_setup_bot_menu_sets_webapp_button():
+    import asyncio
+    from unittest.mock import AsyncMock
+    from types import SimpleNamespace
+    from aiogram.types import MenuButtonWebApp
+
+    import main as main_module
+
+    bot = SimpleNamespace(set_my_commands=AsyncMock(), set_chat_menu_button=AsyncMock())
+    asyncio.run(main_module.setup_bot_menu(bot, "https://shop.example"))
+
+    bot.set_my_commands.assert_awaited_once()
+    bot.set_chat_menu_button.assert_awaited_once()
+    button = bot.set_chat_menu_button.await_args.kwargs["menu_button"]
+    assert isinstance(button, MenuButtonWebApp)
+    assert button.web_app.url == "https://shop.example"
+
+
+def test_setup_bot_menu_falls_back_without_https():
+    import asyncio
+    from unittest.mock import AsyncMock
+    from types import SimpleNamespace
+    from aiogram.types import MenuButtonCommands
+
+    import main as main_module
+
+    bot = SimpleNamespace(set_my_commands=AsyncMock(), set_chat_menu_button=AsyncMock())
+    asyncio.run(main_module.setup_bot_menu(bot, ""))
+
+    button = bot.set_chat_menu_button.await_args.kwargs["menu_button"]
+    assert isinstance(button, MenuButtonCommands)

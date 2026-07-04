@@ -7,6 +7,9 @@ venv/
 *.log
 /data/
 web/node_modules/
-web/dist/
 web/.vite/
 web/*.tsbuildinfo
+web/dist-single/
+# NOTA: web/dist è committato di proposito così Railway serve la Mini App
+# eseguendo solo `python main.py`. Dopo modifiche a web/src rilancia
+# `npm --prefix web run build` e ricommitta web/dist.

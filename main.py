@@ -8,7 +8,13 @@ import json
 
 from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramNetworkError
-from aiogram.types import TelegramObject
+from aiogram.types import (
+    BotCommand,
+    MenuButtonCommands,
+    MenuButtonWebApp,
+    TelegramObject,
+    WebAppInfo,
+)
 from aiogram.client.default import DefaultBotProperties
 
 from oro_naturale.config import load_settings
@@ -17,6 +23,41 @@ from oro_naturale.routers.admin import build_admin_router
 from oro_naturale.routers.public import build_public_router
 from oro_naturale.services import followup_worker
 from oro_naturale.storage import FileStore, load_products_from_db
+from oro_naturale.webserver import start_web_server
+
+
+# Comandi mostrati nel menu "/" di Telegram
+BOT_COMMANDS = [
+    BotCommand(command="start",     description="🏠 Menu principale"),
+    BotCommand(command="catalogo",  description="🛍️ Sfoglia il catalogo"),
+    BotCommand(command="carrello",  description="🛒 Il tuo carrello"),
+    BotCommand(command="ordini",    description="📦 I tuoi ordini"),
+    BotCommand(command="spedizione", description="🚚 Info spedizione"),
+    BotCommand(command="contatti",  description="📞 Contatti"),
+]
+
+
+async def setup_bot_menu(bot: Bot, webapp_url: str) -> None:
+    """Imposta i comandi e il pulsante-menu (Mini App se disponibile via HTTPS)."""
+    try:
+        await bot.set_my_commands(BOT_COMMANDS)
+    except Exception as e:
+        print(f"⚠️ set_my_commands fallito: {e}")
+
+    try:
+        if webapp_url.startswith("https://"):
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="🌿 Negozio",
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            )
+            print(f"🟢 Pulsante Mini App impostato → {webapp_url}")
+        else:
+            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+            print("ℹ️ WEBAPP_URL non HTTPS: pulsante-menu su comandi.")
+    except Exception as e:
+        print(f"⚠️ set_chat_menu_button fallito: {e}")
 
 
 # ==========================================
@@ -203,9 +244,22 @@ async def main() -> None:
     # Worker per followup e notifiche
     asyncio.create_task(followup_worker(bot, store, settings))
 
+    # Web server della Mini App (se Railway/host fornisce una PORT)
+    web_runner = None
+    if settings.web_port:
+        web_runner = await start_web_server(settings.web_port)
+        print(f"🌐 Mini App in ascolto su porta {settings.web_port}")
+    else:
+        print("ℹ️ Nessuna PORT: la Mini App non viene servita da questo processo.")
+
+    # Comandi + pulsante Mini App su Telegram
+    await setup_bot_menu(bot, settings.webapp_url)
+
     # Gestione pulita dei segnali di shutdown
     async def shutdown():
         print("🛑 Chiusura pulita del bot...")
+        if web_runner is not None:
+            await web_runner.cleanup()
         await dp.storage.close()
         await bot.session.close()
 
