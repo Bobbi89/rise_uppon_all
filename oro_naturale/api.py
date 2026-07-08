@@ -293,6 +293,35 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
             )
         return web.json_response({"order": updated})
 
+    # ── POST /admin/orders/{id}/status ────────────────────────────
+
+    ALLOWED_STATUS = {"pending", "paid", "preparing", "shipped", "delivered", "cancelled"}
+    STATUS_MSG = {
+        "preparing": "🧑‍🍳 Il tuo ordine <code>#{id}</code> è <b>in preparazione</b>.",
+        "delivered": "✅ Il tuo ordine <code>#{id}</code> è stato <b>consegnato</b>. Grazie!",
+        "cancelled": "❌ Il tuo ordine <code>#{id}</code> è stato <b>annullato</b>. Contatta il supporto per assistenza.",
+    }
+
+    async def admin_set_status(request: web.Request) -> web.Response:
+        body = await _read_body(request)
+        user = _auth_user(request, body)
+        if not _is_admin(user):
+            return web.json_response({"error": "forbidden"}, status=403)
+
+        oid = request.match_info["id"]
+        status = (body.get("status") or "").strip()
+        if status not in ALLOWED_STATUS:
+            return web.json_response({"error": "stato non valido"}, status=400)
+
+        updated = await asyncio.to_thread(db.update_order_status, oid, status)
+        if not updated:
+            return web.json_response({"error": "ordine non trovato"}, status=404)
+
+        msg = STATUS_MSG.get(status)
+        if msg and updated.get("user_id"):
+            await _notify(int(updated["user_id"]), msg.format(id=oid))
+        return web.json_response({"order": updated})
+
     # ── POST /revolut/webhook ─────────────────────────────────────
 
     async def revolut_webhook(request: web.Request) -> web.Response:
@@ -325,5 +354,6 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
     app.router.add_get("/profile", profile)
     app.router.add_get("/admin/orders", admin_orders)
     app.router.add_post("/admin/orders/{id}/tracking", admin_set_tracking)
+    app.router.add_post("/admin/orders/{id}/status", admin_set_status)
     app.router.add_post("/revolut/webhook", revolut_webhook)
     return app
