@@ -300,3 +300,57 @@ def test_api_full_flow(clean_db, monkeypatch):
         await revrunner.cleanup()
 
     asyncio.run(run())
+
+
+@requires_db
+def test_api_admin_set_status(clean_db, monkeypatch):
+    from aiohttp.test_utils import TestClient, TestServer
+
+    import oro_naturale.api as api
+    from oro_naturale import db as dbmod
+
+    monkeypatch.setenv("DATABASE_URL", clean_db)
+    monkeypatch.setattr(api, "build_client", lambda sk, mode, ver=None: None)
+
+    # ordine già presente
+    dbmod.create_order({
+        "id": "ON-ST", "user_id": 7001, "username": "mario",
+        "items": [{"id": "p1", "name": "Olio", "price": 10.0, "quantity": 1}],
+        "subtotal": 10.0, "shipping": 0, "total": 10.0, "status": "paid",
+    }, database_url=clean_db)
+
+    async def run():
+        notifs = []
+
+        class FakeBot:
+            async def send_message(self, cid, text, **kw):
+                notifs.append((cid, text))
+
+        settings = SimpleNamespace(
+            telegram_bot_token=BOT_TOKEN, admin_chat_ids={42},
+            revolut_public_key="", revolut_secret_key="", revolut_mode="sandbox",
+            revolut_api_version="x", stripe_currency="eur",
+            free_shipping_min=100.0, default_shipping=14.0,
+        )
+        ctx = SimpleNamespace(settings=settings, products=[])
+        client = TestClient(TestServer(api.build_api(ctx, FakeBot())))
+        await client.start_server()
+        AH = {"X-Init-Data": make_init_data({"id": 42, "first_name": "Admin"})}
+        H = {"X-Init-Data": make_init_data({"id": 7001, "first_name": "Mario"})}
+
+        # admin segna "in preparazione" -> notifica utente
+        r = await client.post("/admin/orders/ON-ST/status", headers=AH, json={"status": "preparing"})
+        assert (await r.json())["order"]["status"] == "preparing"
+        assert any(cid == 7001 for cid, _ in notifs)
+
+        # stato non valido -> 400
+        r = await client.post("/admin/orders/ON-ST/status", headers=AH, json={"status": "boh"})
+        assert r.status == 400
+
+        # non-admin -> 403
+        r = await client.post("/admin/orders/ON-ST/status", headers=H, json={"status": "delivered"})
+        assert r.status == 403
+
+        await client.close()
+
+    asyncio.run(run())

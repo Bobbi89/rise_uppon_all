@@ -70,4 +70,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  setStatus: (orderId: string, status: string) =>
+    apiFetch<{ order: ServerOrder }>(`/admin/orders/${orderId}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
 };
