@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CreditCard, Loader2, ShieldCheck, Wallet } from "lucide-react";
+import { Apple, CreditCard, Loader2, ShieldCheck, Wallet } from "lucide-react";
 import type { CartItem, ShippingDetails } from "../types";
 import { formatMoney } from "../utils/money";
 import { Sheet } from "./Sheet";
@@ -18,6 +18,16 @@ type Props = {
 
 const inputClass =
   "w-full rounded-xl border border-olive-100 bg-white px-3.5 py-3 text-sm text-olive-900 placeholder:text-olive-400/60 focus:border-olive-500 focus:outline-none disabled:opacity-60";
+
+/** True se il dispositivo può usare Apple Pay (Safari/iOS con Apple Pay). */
+function applePayAvailable(): boolean {
+  try {
+    const aps = (window as unknown as { ApplePaySession?: { canMakePayments?: () => boolean } }).ApplePaySession;
+    return !!aps?.canMakePayments?.();
+  } catch {
+    return false;
+  }
+}
 
 export function CheckoutSheet({
   open,
@@ -91,9 +101,15 @@ export function CheckoutSheet({
           <div className="text-[12px] leading-4 text-olive-700">
             Pagamento sicuro con <b>Revolut</b>: carta{" "}
             <CreditCard size={12} className="inline align-[-1px]" />, Revolut Pay{" "}
-            <Wallet size={12} className="inline align-[-1px]" /> e Apple Pay (se supportato).
+            <Wallet size={12} className="inline align-[-1px]" /> e Apple Pay.
           </div>
         </div>
+
+        {applePayAvailable() && (
+          <p className="mt-2 flex items-center justify-center gap-1.5 rounded-2xl bg-olive-900 px-3 py-2 text-[12px] font-bold text-cream">
+            <Apple size={14} /> Apple Pay disponibile su questo dispositivo
+          </p>
+        )}
 
         {error && (
           <p className="mt-3 rounded-xl bg-clay/10 px-3 py-2 text-center text-[12px] font-bold text-clay">
