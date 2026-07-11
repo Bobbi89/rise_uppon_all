@@ -41,6 +41,10 @@ class Settings:
     paypal_email: str         # email PayPal su cui ricevere i pagamenti
     paypal_me: str            # link PayPal.me opzionale (es. paypal.me/nome)
 
+    # Contatti del negozio (mostrati in Contatti/Supporto/Negozio)
+    shop_phone: str
+    shop_email: str
+
     # Automazioni
     followup_hours: float     # Ore dopo le quale inviare un messaggio di follow-up
 
@@ -150,6 +154,10 @@ def load_settings() -> Settings:
         # PayPal (email del negozio per pagamenti manuali)
         paypal_email=_env_any("PAYPAL_EMAIL", "PAYPAL_ACCOUNT"),
         paypal_me=_env_any("PAYPAL_ME"),
+
+        # Contatti negozio
+        shop_phone=_env_any("SHOP_PHONE"),
+        shop_email=_env_any("SHOP_EMAIL"),
         
         # Follow-up ordini (es. 24h dopo l'acquisto per recensione/assistenza)
         followup_hours=float(os.getenv("FOLLOWUP_HOURS", "24")),

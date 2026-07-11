@@ -1043,8 +1043,8 @@ def build_public_router(ctx: BotContext) -> Router:
     async def store_info(message: Message) -> None:
         await safe_send_message(
             message,
-            format_store_info(),
-            reply_markup=store_menu(),
+            format_store_info(ctx.settings.shop_phone, ctx.settings.shop_email),
+            reply_markup=store_menu(ctx.settings.shop_phone),
         )
 
     # ─────────────────────────────────────────────────────────────
@@ -1057,16 +1057,16 @@ def build_public_router(ctx: BotContext) -> Router:
     async def support(message: Message) -> None:
         await safe_send_message(
             message,
-            format_support_info(),
-            reply_markup=support_menu(),
+            format_support_info(ctx.settings.shop_phone, ctx.settings.shop_email),
+            reply_markup=support_menu(ctx.settings.shop_phone),
         )
 
     @router.callback_query(F.data == "support")
     async def cb_support(callback: CallbackQuery) -> None:
         await safe_send_message(
             callback,
-            format_support_info(),
-            reply_markup=support_menu(),
+            format_support_info(ctx.settings.shop_phone, ctx.settings.shop_email),
+            reply_markup=support_menu(ctx.settings.shop_phone),
         )
         await callback.answer()
 
@@ -1131,10 +1131,19 @@ def build_public_router(ctx: BotContext) -> Router:
 
     @router.message(Command("contatti"))
     async def contacts(message: Message) -> None:
-        await safe_send_message(
-            message,
-            format_company(ctx.company)
-        )
+        s = ctx.settings
+        lines = ["📞 <b>Contatti — Oro Naturale SRL</b>\n"]
+        if s.shop_phone:
+            lines.append(f"📞 Telefono: {s.shop_phone}")
+        if s.shop_email:
+            lines.append(f"✉️ Email: {s.shop_email}")
+        if s.paypal_email:
+            lines.append(f"💸 PayPal: {s.paypal_email}")
+        if len(lines) == 1:
+            # nessun contatto da settings: fallback ai dati azienda (se presenti)
+            await safe_send_message(message, format_company(ctx.company))
+            return
+        await safe_send_message(message, "\n".join(lines))
 
     @router.message(Command("pagamenti"))
     async def payments_cmd(message: Message) -> None:
