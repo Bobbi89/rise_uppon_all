@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Package, Truck } from "lucide-react";
+import { Loader2, MapPin, Package, Trash2, Truck } from "lucide-react";
 import { api } from "../api";
 import type { ServerOrder } from "../types";
 import { formatMoney } from "../utils/money";
@@ -30,6 +30,7 @@ export function ProfileSheet({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orders, setOrders] = useState<ServerOrder[]>([]);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +42,21 @@ export function ProfileSheet({ open, onClose }: Props) {
       .catch((e) => setError(e.message || "Errore nel caricamento"))
       .finally(() => setLoading(false));
   }, [open]);
+
+  const pendingCount = orders.filter((o) => o.status === "pending").length;
+
+  async function clearPending() {
+    if (clearing) return;
+    setClearing(true);
+    try {
+      const res = await api.clearPending();
+      setOrders(res.orders);
+    } catch (e) {
+      setError((e as Error).message || "Errore");
+    } finally {
+      setClearing(false);
+    }
+  }
 
   return (
     <Sheet open={open} title="I miei ordini" onClose={onClose}>
@@ -60,6 +76,17 @@ export function ProfileSheet({ open, onClose }: Props) {
             <Package size={40} className="mx-auto text-olive-200" />
             <p className="mt-3 text-sm font-semibold text-olive-700">Non hai ancora ordini.</p>
           </div>
+        )}
+
+        {!loading && pendingCount > 0 && (
+          <button
+            onClick={clearPending}
+            disabled={clearing}
+            className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-clay/30 bg-clay/5 py-2.5 text-[12px] font-bold text-clay active:scale-[0.99]"
+          >
+            {clearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Svuota ordini non pagati ({pendingCount})
+          </button>
         )}
 
         <div className="space-y-3">

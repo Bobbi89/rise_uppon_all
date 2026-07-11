@@ -326,12 +326,17 @@ def build_admin_router(ctx: BotContext) -> Router:
         if not items:
             await message.answer("Nessun ordine registrato.")
             return
-        lines = [
-            f"- {i.get('order_id')} | @{i.get('username')} | "
-            f"EUR {i.get('total')} | {i.get('details')}"
-            for i in items
-        ]
-        await message.answer("Ultimi ordini:\n" + "\n".join(lines))
+        lines = []
+        for i in items:
+            uid_i = i.get("user_id")
+            name = i.get("name") or (f"@{i.get('username')}" if i.get("username") else "Cliente")
+            who = f'<a href="tg://user?id={uid_i}">{name}</a>' if uid_i else name
+            lines.append(
+                f"🔹 <code>#{i.get('order_id')}</code> · {who}"
+                + (f" (<code>{uid_i}</code>)" if uid_i else "")
+                + f"\n   € {i.get('total')} · {i.get('details')}"
+            )
+        await message.answer("<b>Ultimi ordini:</b>\n" + "\n".join(lines), parse_mode="HTML")
 
     @router.message(Command("payments"))
     async def payments(message: Message) -> None:

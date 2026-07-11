@@ -253,12 +253,25 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
         customer = await asyncio.to_thread(db.get_customer, uid)
         return web.json_response({"customer": customer, "orders": orders})
 
-    # ── GET /admin/orders ─────────────────────────────────────────
+    # ── POST /profile/clear-pending ───────────────────────────────
+
+    async def clear_pending(request: web.Request) -> web.Response:
+        """Svuota gli ordini non pagati (pending) dell'utente."""
+        user = _auth_user(request, {})
+        if not user:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        uid = int(user["id"])
+        removed = await asyncio.to_thread(db.delete_pending_orders, uid)
+        orders = await asyncio.to_thread(db.list_user_orders, uid)
+        return web.json_response({"removed": removed, "orders": orders})
+
+    # ── GET /admin/orders (solo ordini pagati) ────────────────────
 
     async def admin_orders(request: web.Request) -> web.Response:
         user = _auth_user(request, {})
         if not _is_admin(user):
             return web.json_response({"error": "forbidden"}, status=403)
+        # exclude_pending=True (default): l'admin vede solo ordini pagati
         orders = await asyncio.to_thread(db.list_all_orders)
         return web.json_response({"orders": orders})
 
@@ -352,6 +365,7 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
     app.router.add_post("/orders", create_order)
     app.router.add_post("/orders/{id}/confirm", confirm_order)
     app.router.add_get("/profile", profile)
+    app.router.add_post("/profile/clear-pending", clear_pending)
     app.router.add_get("/admin/orders", admin_orders)
     app.router.add_post("/admin/orders/{id}/tracking", admin_set_tracking)
     app.router.add_post("/admin/orders/{id}/status", admin_set_status)

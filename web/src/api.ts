@@ -63,6 +63,11 @@ export const api = {
   getProfile: () =>
     apiFetch<{ customer: Record<string, unknown> | null; orders: ServerOrder[] }>("/profile"),
 
+  clearPending: () =>
+    apiFetch<{ removed: number; orders: ServerOrder[] }>("/profile/clear-pending", {
+      method: "POST",
+    }),
+
   adminOrders: () => apiFetch<{ orders: ServerOrder[] }>("/admin/orders"),
 
   setTracking: (orderId: string, data: { carrier: string; code: string; url?: string }) =>
