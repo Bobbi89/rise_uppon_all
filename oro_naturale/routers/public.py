@@ -752,11 +752,41 @@ def build_public_router(ctx: BotContext) -> Router:
                 f"🔗 <b>Paga ora:</b>\n{stripe_link}",
             )
 
+        # Istruzioni PayPal (pagamento manuale all'email del negozio)
+        if method == "paypal":
+            if ctx.settings.paypal_email:
+                lines = [
+                    "💸 <b>Pagamento con PayPal</b>",
+                    f"Invia <b>€ {total:.2f}</b> a <code>{ctx.settings.paypal_email}</code>",
+                    "(scegli l'opzione «Amici e Famiglia» per evitare commissioni).",
+                    f"Causale: ordine <code>{order_id}</code>.",
+                ]
+                if ctx.settings.paypal_me:
+                    pm = ctx.settings.paypal_me
+                    if not pm.startswith("http"):
+                        pm = "https://" + pm.lstrip("/")
+                    lines.append(f"🔗 {pm.rstrip('/')}/{total:.2f}EUR")
+                lines.append("Dopo il pagamento inviaci lo <b>screenshot</b> per la conferma. 🙏")
+                await safe_send_message(callback, "\n".join(lines))
+            else:
+                await safe_send_message(
+                    callback,
+                    "💸 Ti invieremo a breve i dati per il pagamento PayPal. Grazie!",
+                )
+
+        # Identità cliente (nome + link Telegram cliccabile per l'admin)
+        cust_name = " ".join(
+            filter(None, [callback.from_user.first_name, callback.from_user.last_name])
+        ).strip() or "Cliente"
+        cust_handle = f"@{callback.from_user.username}" if callback.from_user.username else ""
+        cust_link = f'<a href="tg://user?id={user_id}">{cust_name}</a>'
+
         # Notifica admin
         ctx.store.append_jsonl("orders.jsonl", {
             "order_id": order_id,
             "user_id":  user_id,
             "username": callback.from_user.username,
+            "name":     cust_name,
             "total":    total,
             "ts":       ts,
             "details":  f"{method} | {shipping_method}",
@@ -766,7 +796,8 @@ def build_public_router(ctx: BotContext) -> Router:
                 await callback.bot.send_message(
                     admin_id,
                     f"🔔 <b>NUOVO ORDINE</b> <code>#{order_id}</code>\n"
-                    f"👤 @{callback.from_user.username or user_id}\n"
+                    f"👤 {cust_link} {cust_handle}\n"
+                    f"🆔 <code>{user_id}</code>\n"
                     f"💴 € {total:.2f} | {method_label}\n"
                     f"🚚 {shipping_label}",
                     parse_mode="HTML",

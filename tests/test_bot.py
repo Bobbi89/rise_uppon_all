@@ -508,3 +508,14 @@ def test_menus_skip_webapp_button_for_non_https():
     # con https il pulsante c'è
     m2 = main_menu(0, "https://shop.example")
     assert m2.keyboard[0][0].web_app.url == "https://shop.example"
+
+
+def test_config_reads_paypal_env(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x")
+    monkeypatch.setenv("PAYPAL_EMAIL", "shop@example.com")
+    monkeypatch.setenv("PAYPAL_ME", "paypal.me/shop")
+    from oro_naturale.config import load_settings
+
+    s = load_settings()
+    assert s.paypal_email == "shop@example.com"
+    assert s.paypal_me == "paypal.me/shop"

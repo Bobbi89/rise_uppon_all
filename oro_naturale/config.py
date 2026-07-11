@@ -37,6 +37,10 @@ class Settings:
     revolut_mode: str         # "sandbox" | "prod"
     revolut_api_version: str
 
+    # Pagamenti (PayPal — manuale: pagamento all'email del negozio)
+    paypal_email: str         # email PayPal su cui ricevere i pagamenti
+    paypal_me: str            # link PayPal.me opzionale (es. paypal.me/nome)
+
     # Automazioni
     followup_hours: float     # Ore dopo le quale inviare un messaggio di follow-up
 
@@ -142,6 +146,10 @@ def load_settings() -> Settings:
         ),
         revolut_mode=(_env_any("REVOLUT_MODE", default="sandbox").lower()),
         revolut_api_version=_env_any("REVOLUT_API_VERSION", default="2024-09-01"),
+
+        # PayPal (email del negozio per pagamenti manuali)
+        paypal_email=_env_any("PAYPAL_EMAIL", "PAYPAL_ACCOUNT"),
+        paypal_me=_env_any("PAYPAL_ME"),
         
         # Follow-up ordini (es. 24h dopo l'acquisto per recensione/assistenza)
         followup_hours=float(os.getenv("FOLLOWUP_HOURS", "24")),
