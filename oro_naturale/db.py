@@ -209,11 +209,35 @@ def list_user_orders(user_id: int, limit: int = 50, database_url: str | None = N
             return [_serialize(r) for r in cur.fetchall()]
 
 
-def list_all_orders(limit: int = 100, database_url: str | None = None) -> list[dict]:
+def list_all_orders(
+    limit: int = 100,
+    *,
+    exclude_pending: bool = True,
+    database_url: str | None = None,
+) -> list[dict]:
+    """
+    Elenco ordini per l'admin. Di default esclude i 'pending' (non pagati):
+    l'admin vede solo gli ordini effettivamente pagati.
+    """
+    where = "WHERE status <> 'pending'" if exclude_pending else ""
     with _conn(database_url) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT %s", (limit,))
+            cur.execute(
+                f"SELECT * FROM orders {where} ORDER BY created_at DESC LIMIT %s",
+                (limit,),
+            )
             return [_serialize(r) for r in cur.fetchall()]
+
+
+def delete_pending_orders(user_id: int, database_url: str | None = None) -> int:
+    """Elimina gli ordini non pagati (pending) dell'utente. Ritorna quanti ne ha rimossi."""
+    with _conn(database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM orders WHERE user_id = %s AND status = 'pending'",
+                (user_id,),
+            )
+            return cur.rowcount
 
 
 def update_order_status(

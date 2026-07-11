@@ -354,3 +354,72 @@ def test_api_admin_set_status(clean_db, monkeypatch):
         await client.close()
 
     asyncio.run(run())
+
+
+@requires_db
+def test_admin_excludes_pending_and_clear_pending(clean_db):
+    from oro_naturale import db as dbmod
+
+    # 2 ordini utente 1: uno pending, uno pagato
+    dbmod.create_order({"id": "ON-P1", "user_id": 1, "items": [], "total": 10, "status": "pending"}, database_url=clean_db)
+    dbmod.create_order({"id": "ON-PAID", "user_id": 1, "items": [], "total": 20, "status": "paid"}, database_url=clean_db)
+    # ordine pending di un altro utente
+    dbmod.create_order({"id": "ON-P2", "user_id": 2, "items": [], "total": 5, "status": "pending"}, database_url=clean_db)
+
+    # admin vede solo i pagati
+    admin = dbmod.list_all_orders(database_url=clean_db)
+    ids = {o["id"] for o in admin}
+    assert "ON-PAID" in ids and "ON-P1" not in ids and "ON-P2" not in ids
+    # con exclude_pending=False li vede tutti
+    assert len(dbmod.list_all_orders(exclude_pending=False, database_url=clean_db)) == 3
+
+    # l'utente 1 vede entrambi i suoi (pending + pagato)
+    assert len(dbmod.list_user_orders(1, database_url=clean_db)) == 2
+
+    # svuota i pending dell'utente 1: resta solo il pagato; l'altro utente non è toccato
+    removed = dbmod.delete_pending_orders(1, database_url=clean_db)
+    assert removed == 1
+    remaining = {o["id"] for o in dbmod.list_user_orders(1, database_url=clean_db)}
+    assert remaining == {"ON-PAID"}
+    assert len(dbmod.list_user_orders(2, database_url=clean_db)) == 1  # ON-P2 intatto
+
+
+@requires_db
+def test_api_clear_pending_endpoint(clean_db, monkeypatch):
+    from aiohttp.test_utils import TestClient, TestServer
+    import oro_naturale.api as api
+    from oro_naturale import db as dbmod
+
+    monkeypatch.setenv("DATABASE_URL", clean_db)
+    monkeypatch.setattr(api, "build_client", lambda sk, mode, ver=None: None)
+
+    dbmod.create_order({"id": "ON-UP", "user_id": 55, "items": [], "total": 9, "status": "pending"}, database_url=clean_db)
+    dbmod.create_order({"id": "ON-OK", "user_id": 55, "items": [], "total": 9, "status": "paid"}, database_url=clean_db)
+
+    async def run():
+        settings = SimpleNamespace(
+            telegram_bot_token=BOT_TOKEN, admin_chat_ids={42}, revolut_public_key="",
+            revolut_secret_key="", revolut_mode="sandbox", revolut_api_version="x",
+            stripe_currency="eur", free_shipping_min=100.0, default_shipping=14.0,
+        )
+        ctx = SimpleNamespace(settings=settings, products=[])
+        client = TestClient(TestServer(api.build_api(ctx, None)))
+        await client.start_server()
+        H = {"X-Init-Data": make_init_data({"id": 55, "first_name": "U"})}
+
+        # profilo mostra pending + pagato
+        r = await client.get("/profile", headers=H)
+        assert len((await r.json())["orders"]) == 2
+
+        # svuota non pagati
+        r = await client.post("/profile/clear-pending", headers=H, json={})
+        body = await r.json()
+        assert body["removed"] == 1 and [o["id"] for o in body["orders"]] == ["ON-OK"]
+
+        # senza auth -> 401
+        r = await client.post("/profile/clear-pending", json={})
+        assert r.status == 401
+
+        await client.close()
+
+    asyncio.run(run())
