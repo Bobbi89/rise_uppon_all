@@ -634,19 +634,36 @@ def profile_menu() -> InlineKeyboardMarkup:
     )
 
 
-def store_menu() -> InlineKeyboardMarkup:
-    return _ikb(
+def _tel_link(phone: str) -> str:
+    """Normalizza un numero in link tel: (prefisso +39 se manca)."""
+    digits = phone.strip().replace(" ", "")
+    if not digits:
+        return ""
+    if not digits.startswith("+"):
+        digits = "+39" + digits.lstrip("0")
+    return f"tel:{digits}"
+
+
+def store_menu(phone: str = "") -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = [
         [_btn_url("🗺️ Apri su Google Maps", "https://maps.google.com")],
-        [_btn("🏠 Menu", "main_menu")],
-    )
+    ]
+    tel = _tel_link(phone)
+    if tel:
+        rows.append([_btn_url("📞 Chiama il negozio", tel)])
+    rows.append([_btn("🏠 Menu", "main_menu")])
+    return _ikb(*rows)
 
 
-def support_menu() -> InlineKeyboardMarkup:
-    return _ikb(
-        [_btn("💬 Scrivi all'operatore",   "support_write")],
-        [_btn_url("📞 Chiama il negozio",  "tel:+390000000000")],
-        [_btn("🏠 Menu",                   "main_menu")],
-    )
+def support_menu(phone: str = "") -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = [
+        [_btn("💬 Scrivi all'operatore", "support_write")],
+    ]
+    tel = _tel_link(phone)
+    if tel:
+        rows.append([_btn_url("📞 Chiama il negozio", tel)])
+    rows.append([_btn("🏠 Menu", "main_menu")])
+    return _ikb(*rows)
 
 
 def back_to_categories_menu() -> InlineKeyboardMarkup:
@@ -939,25 +956,32 @@ def format_profile(user, cart_count: int, fav_count: int) -> str:
     )
 
 
-def format_store_info() -> str:
+def format_store_info(phone: str = "", email: str = "") -> str:
+    phone_line = f"📞 {phone}\n" if phone else ""
+    email_line = f"✉️ {email}\n" if email else ""
     return (
-        "📍 <b>Oro Naturale</b>\n\n"
-        "🏪 Via Roma 1, 06083 Bastia Umbra (PG)\n"
-        "📞 +39 075 0000000\n"
-        "✉️ info@oronaturale.it\n\n"
-        "🕐 <b>Orari:</b>\n"
+        "📍 <b>Oro Naturale SRL</b>\n\n"
+        f"{phone_line}"
+        f"{email_line}"
+        "\n🕐 <b>Orari:</b>\n"
         "Lun–Ven: 9:00 – 19:00\n"
         "Sab: 9:00 – 13:00\n"
-        "Dom: chiuso\n\n"
-        "🚗 <i>Uscita Bastia Umbra del SS75</i>"
+        "Dom: chiuso"
     )
 
 
-def format_support_info() -> str:
+def format_support_info(phone: str = "", email: str = "") -> str:
+    contact = ""
+    if phone:
+        contact += f"📞 {phone}\n"
+    if email:
+        contact += f"✉️ {email}\n"
+    contact_block = f"\n{contact}" if contact else ""
     return (
         "🎧 <b>Supporto clienti</b>\n\n"
         "Siamo qui per aiutarti!\n"
         "Tempo medio di risposta: <b>< 2 ore</b> 🕐"
+        f"{contact_block}"
     )
 
 

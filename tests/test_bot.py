@@ -519,3 +519,20 @@ def test_config_reads_paypal_env(monkeypatch):
     s = load_settings()
     assert s.paypal_email == "shop@example.com"
     assert s.paypal_me == "paypal.me/shop"
+
+
+def test_config_and_tel_link_for_shop_contacts(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x")
+    monkeypatch.setenv("SHOP_PHONE", "3421782640")
+    monkeypatch.setenv("SHOP_EMAIL", "oronaturalesrl@gmail.com")
+    from oro_naturale.config import load_settings
+    from oro_naturale.keyboards import _tel_link, store_menu
+
+    s = load_settings()
+    assert s.shop_phone == "3421782640" and s.shop_email == "oronaturalesrl@gmail.com"
+    assert _tel_link("3421782640") == "tel:+393421782640"
+    assert _tel_link("+39 342 178 2640") == "tel:+393421782640"
+    assert _tel_link("") == ""
+    # con telefono compare il pulsante Chiama; senza no
+    assert any("Chiama" in b.text for row in store_menu("3421782640").inline_keyboard for b in row)
+    assert not any("Chiama" in b.text for row in store_menu("").inline_keyboard for b in row)
