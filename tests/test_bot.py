@@ -536,3 +536,54 @@ def test_config_and_tel_link_for_shop_contacts(monkeypatch):
     # con telefono compare il pulsante Chiama; senza no
     assert any("Chiama" in b.text for row in store_menu("3421782640").inline_keyboard for b in row)
     assert not any("Chiama" in b.text for row in store_menu("").inline_keyboard for b in row)
+
+
+def test_inchat_order_captures_items(tmp_path, monkeypatch):
+    """L'ordine in-chat (anche ritiro in negozio) salva e notifica gli articoli + quantità."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    import oro_naturale.routers.public as pub
+    from oro_naturale.catalog import product_key
+    from oro_naturale.context import BotContext
+
+    settings = SimpleNamespace(
+        admin_chat_ids={42}, webapp_url="", followup_hours=24.0,
+        paypal_email="pay@shop.it", paypal_me="",
+        stripe_secret_key="", stripe_currency="eur",
+    )
+    store = FileStore(tmp_path)
+    ctx = BotContext(settings=settings, store=store)  # type: ignore[arg-type]
+    p = make_product("Olio ORO 250ml", 12.95)
+    ctx.reload_products([p])
+
+    uid = 700
+    ctx.customers[str(uid)] = {"cart": {product_key(p): 2}}
+    ctx.set_checkout(uid, {"shipping": "pickup", "shipping_cost": 0.0, "discount": 0.0, "coupon": None, "total": 25.90})
+
+    sent = []
+
+    async def fake_send(target, text, **kw):
+        sent.append(text)
+
+    monkeypatch.setattr(pub, "safe_send_message", fake_send)
+    router = pub.build_public_router(ctx)
+    cb_pay = next(h.callback for h in router.callback_query.handlers if h.callback.__name__ == "cb_pay")
+
+    bot = SimpleNamespace(send_message=AsyncMock())
+    callback = SimpleNamespace(
+        from_user=SimpleNamespace(id=uid, username="mario", first_name="Mario", last_name="Rossi"),
+        data="pay:paypal", bot=bot, answer=AsyncMock(),
+    )
+    asyncio.run(cb_pay(callback))
+
+    # salvato su orders.jsonl con gli articoli
+    orders = store.tail_jsonl("orders.jsonl", 5)
+    assert orders and orders[0]["items"][0]["name"] == "Olio ORO 250ml"
+    assert orders[0]["items"][0]["quantity"] == 2
+
+    # notifica admin contiene gli articoli
+    admin_txt = bot.send_message.await_args.args[1]
+    assert "Olio ORO 250ml" in admin_txt and "2×" in admin_txt
+    assert "Ritiro in negozio" in admin_txt
