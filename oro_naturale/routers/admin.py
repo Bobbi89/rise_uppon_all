@@ -331,11 +331,14 @@ def build_admin_router(ctx: BotContext) -> Router:
             uid_i = i.get("user_id")
             name = i.get("name") or (f"@{i.get('username')}" if i.get("username") else "Cliente")
             who = f'<a href="tg://user?id={uid_i}">{name}</a>' if uid_i else name
-            lines.append(
+            block = (
                 f"🔹 <code>#{i.get('order_id')}</code> · {who}"
                 + (f" (<code>{uid_i}</code>)" if uid_i else "")
-                + f"\n   € {i.get('total')} · {i.get('details')}"
             )
+            for it in (i.get("items") or []):
+                block += f"\n   • {it.get('quantity')}× {it.get('name')}"
+            block += f"\n   💴 € {i.get('total')} · {i.get('details')}"
+            lines.append(block)
         await message.answer("<b>Ultimi ordini:</b>\n" + "\n".join(lines), parse_mode="HTML")
 
     @router.message(Command("payments"))

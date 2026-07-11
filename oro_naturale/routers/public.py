@@ -697,6 +697,22 @@ def build_public_router(ctx: BotContext) -> Router:
             f"{user_id}{ts}".encode()
         ).hexdigest()[:8].upper()
 
+        # Cattura gli articoli ordinati dal carrello (PRIMA di svuotarlo)
+        cart_now = get_cart(user_id)
+        order_items: list[dict] = []
+        for key, qty in cart_now.items():
+            prod = get_product_by_key(key)
+            name = prod.name if prod else key
+            try:
+                price = float(str(prod.price).replace(",", ".")) if (prod and prod.price) else 0.0
+            except (TypeError, ValueError):
+                price = 0.0
+            order_items.append({"name": name, "quantity": int(qty), "price": price})
+        items_text = "\n".join(
+            f"  • {it['quantity']}× {it['name']} — € {it['price'] * it['quantity']:.2f}"
+            for it in order_items
+        ) or "  • (articoli non disponibili)"
+
         # Salva ordine nel profilo utente
         record = customer_record(user_id)
         shipping_method = checkout.get("shipping", "home")
@@ -707,6 +723,7 @@ def build_public_router(ctx: BotContext) -> Router:
             "ts":       ts,
             "shipping": shipping_method,
             "payment":  method,
+            "items":    order_items,
         })
         record["stage"] = "payment_pending"
         record["next_followup"] = ts + int(ctx.settings.followup_hours * 3600)
@@ -742,7 +759,7 @@ def build_public_router(ctx: BotContext) -> Router:
         )
         await safe_send_message(
             callback,
-            confirm_text,
+            confirm_text + f"\n\n🛒 <b>Riepilogo:</b>\n{items_text}",
             reply_markup=order_confirmed_menu(order_id),
         )
 
@@ -789,6 +806,7 @@ def build_public_router(ctx: BotContext) -> Router:
             "name":     cust_name,
             "total":    total,
             "ts":       ts,
+            "items":    order_items,
             "details":  f"{method} | {shipping_method}",
         })
         for admin_id in ctx.settings.admin_chat_ids:
@@ -798,7 +816,8 @@ def build_public_router(ctx: BotContext) -> Router:
                     f"🔔 <b>NUOVO ORDINE</b> <code>#{order_id}</code>\n"
                     f"👤 {cust_link} {cust_handle}\n"
                     f"🆔 <code>{user_id}</code>\n"
-                    f"💴 € {total:.2f} | {method_label}\n"
+                    f"🛒 <b>Ordine:</b>\n{items_text}\n"
+                    f"💴 Totale: € {total:.2f} | {method_label}\n"
                     f"🚚 {shipping_label}",
                     parse_mode="HTML",
                 )
