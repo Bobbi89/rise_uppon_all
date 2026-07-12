@@ -103,6 +103,8 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
             "revolut_public_key": settings.revolut_public_key,
             "revolut_mode": settings.revolut_mode,
             "revolut_enabled": bool(settings.revolut_secret_key and settings.revolut_public_key),
+            "paypal_enabled": bool(settings.paypal_email),
+            "paypal_email": settings.paypal_email,
             "currency": (settings.stripe_currency or "eur").upper(),
             "free_shipping_min": settings.free_shipping_min,
             "default_shipping": settings.default_shipping,
@@ -150,7 +152,37 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
             city=shipping_in.get("city"), zip_code=shipping_in.get("zip"),
         )
 
-        # Crea ordine Revolut (se configurato)
+        payment_method = (body.get("payment_method") or "revolut").lower()
+        base_order = {
+            "id": oid, "user_id": int(user["id"]), "username": user.get("username"),
+            "items": items, "subtotal": subtotal, "shipping": shipping, "total": total,
+            "currency": currency,
+            "shipping_name": shipping_in.get("name"), "shipping_phone": shipping_in.get("phone"),
+            "shipping_address": shipping_in.get("address"), "shipping_city": shipping_in.get("city"),
+            "shipping_zip": shipping_in.get("zip"), "shipping_notes": shipping_in.get("notes"),
+        }
+
+        # ── PayPal: ordine "in attesa di pagamento" (pagamento manuale) ──
+        if payment_method == "paypal":
+            if not settings.paypal_email:
+                return web.json_response({"error": "PayPal non configurato"}, status=400)
+            order = {
+                **base_order, "status": "awaiting_payment",
+                "payment_method": "paypal", "payment_provider": "paypal",
+            }
+            await asyncio.to_thread(db.create_order, order)
+            await _notify_admins_new_order(await asyncio.to_thread(db.get_order, oid) or order, paid=False)
+            pm = settings.paypal_me
+            if pm and not pm.startswith("http"):
+                pm = "https://" + pm.lstrip("/")
+            return web.json_response({
+                "order_id": oid, "total": total, "subtotal": subtotal, "shipping": shipping,
+                "currency": currency, "payment_method": "paypal",
+                "paypal_email": settings.paypal_email,
+                "paypal_link": f"{pm.rstrip('/')}/{total:.2f}EUR" if pm else None,
+            })
+
+        # ── Revolut (default) ──
         revolut_token = None
         revolut_order_id = None
         client = build_client(settings.revolut_secret_key, settings.revolut_mode, settings.revolut_api_version)
@@ -169,14 +201,9 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
                 return web.json_response({"error": "pagamento non disponibile", "detail": str(exc)}, status=502)
 
         order = {
-            "id": oid, "user_id": int(user["id"]), "username": user.get("username"),
-            "items": items, "subtotal": subtotal, "shipping": shipping, "total": total,
-            "currency": currency, "status": "pending",
+            **base_order, "status": "pending",
             "payment_method": None, "payment_provider": "revolut" if client else None,
             "revolut_order_id": revolut_order_id,
-            "shipping_name": shipping_in.get("name"), "shipping_phone": shipping_in.get("phone"),
-            "shipping_address": shipping_in.get("address"), "shipping_city": shipping_in.get("city"),
-            "shipping_zip": shipping_in.get("zip"), "shipping_notes": shipping_in.get("notes"),
         }
         await asyncio.to_thread(db.create_order, order)
 
@@ -186,6 +213,7 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
             "subtotal": subtotal,
             "shipping": shipping,
             "currency": currency,
+            "payment_method": "revolut",
             "revolut_token": revolut_token,
             "revolut_public_key": settings.revolut_public_key,
             "revolut_mode": settings.revolut_mode,
@@ -226,12 +254,16 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
 
         return web.json_response({"order": order, "paid": False})
 
-    async def _notify_admins_new_order(order: dict) -> None:
+    async def _notify_admins_new_order(order: dict, paid: bool = True) -> None:
         items_txt = "\n".join(
             f"  • {i.get('quantity')}× {i.get('name')}" for i in (order.get("items") or [])
         )
+        header = (
+            "🔔 <b>NUOVO ORDINE PAGATO</b>" if paid
+            else "🟡 <b>NUOVO ORDINE — PayPal DA CONFERMARE</b>"
+        )
         text = (
-            f"🔔 <b>NUOVO ORDINE PAGATO</b> <code>#{order['id']}</code>\n"
+            f"{header} <code>#{order['id']}</code>\n"
             f"👤 {order.get('shipping_name') or '—'} (@{order.get('username') or order.get('user_id')})\n"
             f"📞 {order.get('shipping_phone') or '—'}\n"
             f"📍 {order.get('shipping_address') or ''}, {order.get('shipping_zip') or ''} {order.get('shipping_city') or ''}\n"
@@ -308,7 +340,7 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
 
     # ── POST /admin/orders/{id}/status ────────────────────────────
 
-    ALLOWED_STATUS = {"pending", "paid", "preparing", "shipped", "delivered", "cancelled"}
+    ALLOWED_STATUS = {"pending", "awaiting_payment", "paid", "preparing", "shipped", "delivered", "cancelled"}
     STATUS_MSG = {
         "preparing": "🧑‍🍳 Il tuo ordine <code>#{id}</code> è <b>in preparazione</b>.",
         "delivered": "✅ Il tuo ordine <code>#{id}</code> è stato <b>consegnato</b>. Grazie!",

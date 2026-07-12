@@ -12,6 +12,7 @@ type Props = {
 
 const STATUS: Record<string, { text: string; className: string }> = {
   pending: { text: "Da pagare", className: "bg-gold/15 text-clay" },
+  awaiting_payment: { text: "PayPal da confermare", className: "bg-gold/15 text-clay" },
   paid: { text: "Pagato", className: "bg-olive-100 text-olive-700" },
   preparing: { text: "In preparazione", className: "bg-gold/15 text-clay" },
   shipped: { text: "Spedito", className: "bg-olive-900 text-cream" },
@@ -107,6 +108,12 @@ function OrderCard({ order, onPatch }: { order: ServerOrder; onPatch: (o: Server
 
       {/* Azioni stato */}
       <div className="mt-2 flex flex-wrap gap-1.5">
+        {order.status === "awaiting_payment" && (
+          <button onClick={() => setStatus("paid")} disabled={busy}
+            className="flex items-center gap-1 rounded-full bg-olive-900 px-2.5 py-1 text-[11px] font-bold text-cream active:scale-95">
+            <CheckCircle2 size={12} /> Segna pagato
+          </button>
+        )}
         <button onClick={() => setStatus("preparing")} disabled={busy}
           className="flex items-center gap-1 rounded-full bg-olive-100 px-2.5 py-1 text-[11px] font-bold text-olive-700 active:scale-95">
           <ChefHat size={12} /> Preparazione
@@ -165,7 +172,9 @@ export function AdminSheet({ open, onClose }: Props) {
   }
 
   const stats = useMemo(() => {
-    const paid = orders.filter((o) => o.status !== "pending" && o.status !== "cancelled");
+    const paid = orders.filter(
+      (o) => o.status !== "pending" && o.status !== "awaiting_payment" && o.status !== "cancelled",
+    );
     const revenue = paid.reduce((s, o) => s + o.total, 0);
     const toShip = orders.filter((o) => o.status === "paid" || o.status === "preparing").length;
     return { total: orders.length, revenue, toShip };
