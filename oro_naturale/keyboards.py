@@ -644,9 +644,18 @@ def _tel_link(phone: str) -> str:
     return f"tel:{digits}"
 
 
-def store_menu(phone: str = "") -> InlineKeyboardMarkup:
+def _maps_link(address: str) -> str:
+    """Link Google Maps che cerca l'indirizzo del negozio."""
+    from urllib.parse import quote_plus
+
+    if not address.strip():
+        return "https://maps.google.com"
+    return f"https://www.google.com/maps/search/?api=1&query={quote_plus(address)}"
+
+
+def store_menu(phone: str = "", address: str = "") -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
-        [_btn_url("🗺️ Apri su Google Maps", "https://maps.google.com")],
+        [_btn_url("🗺️ Apri su Google Maps", _maps_link(address))],
     ]
     tel = _tel_link(phone)
     if tel:
@@ -956,11 +965,13 @@ def format_profile(user, cart_count: int, fav_count: int) -> str:
     )
 
 
-def format_store_info(phone: str = "", email: str = "") -> str:
+def format_store_info(phone: str = "", email: str = "", address: str = "") -> str:
+    addr_line = f"🏪 {address}\n" if address else ""
     phone_line = f"📞 {phone}\n" if phone else ""
     email_line = f"✉️ {email}\n" if email else ""
     return (
         "📍 <b>Oro Naturale SRL</b>\n\n"
+        f"{addr_line}"
         f"{phone_line}"
         f"{email_line}"
         "\n🕐 <b>Orari:</b>\n"

@@ -587,3 +587,24 @@ def test_inchat_order_captures_items(tmp_path, monkeypatch):
     admin_txt = bot.send_message.await_args.args[1]
     assert "Olio ORO 250ml" in admin_txt and "2×" in admin_txt
     assert "Ritiro in negozio" in admin_txt
+
+
+def test_config_shop_address_and_maps_link(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x")
+    monkeypatch.delenv("SHOP_ADDRESS", raising=False)
+    from oro_naturale.config import load_settings
+    from oro_naturale.keyboards import _maps_link, format_store_info, store_menu
+
+    s = load_settings()
+    # default = indirizzo del negozio
+    assert "Ponte Vecchio 3" in s.shop_address and "Niccone" in s.shop_address
+    # override via env
+    monkeypatch.setenv("SHOP_ADDRESS", "Via Roma 1, Perugia")
+    assert load_settings().shop_address == "Via Roma 1, Perugia"
+
+    # l'indirizzo compare nella scheda negozio
+    assert "Ponte Vecchio 3" in format_store_info(address=s.shop_address)
+    # il pulsante Maps cerca l'indirizzo
+    link = _maps_link(s.shop_address)
+    assert "google.com/maps/search" in link and "Ponte" in link
+    assert store_menu("", s.shop_address).inline_keyboard[0][0].url == link
