@@ -1062,8 +1062,8 @@ def build_public_router(ctx: BotContext) -> Router:
     async def store_info(message: Message) -> None:
         await safe_send_message(
             message,
-            format_store_info(ctx.settings.shop_phone, ctx.settings.shop_email),
-            reply_markup=store_menu(ctx.settings.shop_phone),
+            format_store_info(ctx.settings.shop_phone, ctx.settings.shop_email, ctx.settings.shop_address),
+            reply_markup=store_menu(ctx.settings.shop_phone, ctx.settings.shop_address),
         )
 
     # ─────────────────────────────────────────────────────────────
@@ -1152,6 +1152,8 @@ def build_public_router(ctx: BotContext) -> Router:
     async def contacts(message: Message) -> None:
         s = ctx.settings
         lines = ["📞 <b>Contatti — Oro Naturale SRL</b>\n"]
+        if s.shop_address:
+            lines.append(f"🏪 Negozio: {s.shop_address}")
         if s.shop_phone:
             lines.append(f"📞 Telefono: {s.shop_phone}")
         if s.shop_email:

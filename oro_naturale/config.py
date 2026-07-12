@@ -44,6 +44,7 @@ class Settings:
     # Contatti del negozio (mostrati in Contatti/Supporto/Negozio)
     shop_phone: str
     shop_email: str
+    shop_address: str
 
     # Automazioni
     followup_hours: float     # Ore dopo le quale inviare un messaggio di follow-up
@@ -158,6 +159,7 @@ def load_settings() -> Settings:
         # Contatti negozio
         shop_phone=_env_any("SHOP_PHONE"),
         shop_email=_env_any("SHOP_EMAIL"),
+        shop_address=_env_any("SHOP_ADDRESS", default="Via Ponte Vecchio 3, Niccone (PG)"),
         
         # Follow-up ordini (es. 24h dopo l'acquisto per recensione/assistenza)
         followup_hours=float(os.getenv("FOLLOWUP_HOURS", "24")),
