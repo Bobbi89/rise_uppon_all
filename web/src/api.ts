@@ -6,6 +6,8 @@ export type ApiConfig = {
   revolut_public_key: string;
   revolut_mode: "sandbox" | "prod";
   revolut_enabled: boolean;
+  paypal_enabled: boolean;
+  paypal_email: string;
   currency: string;
   free_shipping_min: number;
   default_shipping: number;
@@ -18,9 +20,12 @@ export type CreateOrderResult = {
   subtotal: number;
   shipping: number;
   currency: string;
-  revolut_token: string | null;
-  revolut_public_key: string;
-  revolut_mode: "sandbox" | "prod";
+  payment_method: "revolut" | "paypal";
+  revolut_token?: string | null;
+  revolut_public_key?: string;
+  revolut_mode?: "sandbox" | "prod";
+  paypal_email?: string;
+  paypal_link?: string | null;
 };
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -48,10 +53,14 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 export const api = {
   getConfig: () => apiFetch<ApiConfig>("/config"),
 
-  createOrder: (items: { id: string; quantity: number }[], shipping: ShippingDetails) =>
+  createOrder: (
+    items: { id: string; quantity: number }[],
+    shipping: ShippingDetails,
+    paymentMethod: "revolut" | "paypal" = "revolut",
+  ) =>
     apiFetch<CreateOrderResult>("/orders", {
       method: "POST",
-      body: JSON.stringify({ items, shipping }),
+      body: JSON.stringify({ items, shipping, payment_method: paymentMethod }),
     }),
 
   confirmOrder: (orderId: string, paymentMethod: PaymentMethod) =>

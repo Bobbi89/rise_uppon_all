@@ -3,7 +3,7 @@ import { api, type ApiConfig } from "./api";
 import { AdminSheet } from "./components/AdminSheet";
 import { CartSheet } from "./components/CartSheet";
 import { CategoryChips } from "./components/CategoryChips";
-import { CheckoutSheet } from "./components/CheckoutSheet";
+import { CheckoutSheet, type PayChoice } from "./components/CheckoutSheet";
 import { Header } from "./components/Header";
 import { ProductCard } from "./components/ProductCard";
 import { ProductSheet } from "./components/ProductSheet";
@@ -26,7 +26,13 @@ export default function App() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; total: number; paid: boolean } | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<{
+    id: string;
+    total: number;
+    paid: boolean;
+    paypalEmail?: string;
+    paypalLink?: string | null;
+  } | null>(null);
 
   const [config, setConfig] = useState<ApiConfig | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -82,14 +88,24 @@ export default function App() {
     );
   }
 
-  // Flusso pagamento: crea ordine (server) → paga con Revolut → conferma.
-  async function pay(details: ShippingDetails) {
+  // Flusso pagamento: crea ordine (server) → Revolut (carta) o PayPal (istruzioni).
+  async function pay(details: ShippingDetails, method: PayChoice) {
     if (processing) return;
     setProcessing(true);
     setCheckoutError(null);
     try {
       const items = cart.map((item) => ({ id: item.product.id, quantity: item.quantity }));
-      const created = await api.createOrder(items, details);
+      const created = await api.createOrder(items, details, method);
+
+      if (method === "paypal") {
+        // Ordine registrato "in attesa di pagamento": mostra le istruzioni PayPal.
+        hapticSuccess();
+        finishOrder(created.order_id, created.total, false, {
+          paypalEmail: created.paypal_email,
+          paypalLink: created.paypal_link,
+        });
+        return;
+      }
 
       if (!created.revolut_token) {
         // Revolut non configurato: ordine registrato come "da pagare".
@@ -98,7 +114,7 @@ export default function App() {
         return;
       }
 
-      const outcome = await payWithRevolut(created.revolut_token, created.revolut_mode);
+      const outcome = await payWithRevolut(created.revolut_token, created.revolut_mode ?? "prod");
       if (outcome === "cancel") {
         setProcessing(false);
         return; // l'utente ha annullato: resta nel checkout
@@ -120,11 +136,22 @@ export default function App() {
     }
   }
 
-  function finishOrder(id: string, orderTotal: number, paid: boolean) {
+  function finishOrder(
+    id: string,
+    orderTotal: number,
+    paid: boolean,
+    paypal?: { paypalEmail?: string; paypalLink?: string | null },
+  ) {
     setProcessing(false);
     setCheckoutOpen(false);
     setCart([]);
-    setConfirmedOrder({ id, total: orderTotal, paid });
+    setConfirmedOrder({
+      id,
+      total: orderTotal,
+      paid,
+      paypalEmail: paypal?.paypalEmail,
+      paypalLink: paypal?.paypalLink,
+    });
   }
 
   const overlayOpen =
@@ -230,6 +257,7 @@ export default function App() {
         processing={processing}
         error={checkoutError}
         revolutEnabled={config?.revolut_enabled ?? false}
+        paypalEnabled={config?.paypal_enabled ?? false}
         onClose={() => {
           if (!processing) setCheckoutOpen(false);
         }}

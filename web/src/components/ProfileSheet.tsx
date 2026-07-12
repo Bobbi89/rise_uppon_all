@@ -12,6 +12,7 @@ type Props = {
 
 const STATUS_LABEL: Record<string, { text: string; className: string }> = {
   pending: { text: "Da pagare", className: "bg-gold/15 text-clay" },
+  awaiting_payment: { text: "PayPal in attesa", className: "bg-gold/15 text-clay" },
   paid: { text: "Pagato", className: "bg-olive-100 text-olive-700" },
   preparing: { text: "In preparazione", className: "bg-olive-100 text-olive-700" },
   shipped: { text: "Spedito", className: "bg-olive-900 text-cream" },
