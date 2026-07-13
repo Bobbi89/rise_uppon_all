@@ -35,6 +35,23 @@ def _order_id() -> str:
     return f"ON-{int(time.time())}-{int(time.time() * 1000) % 1000:03d}"
 
 
+# Fasce di spedizione allineate a biomarketshop.com.
+_NORDIC = {"SE", "NO", "DK", "FI", "IS"}
+_EUROPE = {"IT", "FR", "ES", "DE", "AT", "BE", "NL", "PT", "GR", "IE", "LU", "CH", "GB"}
+
+
+def _compute_shipping(subtotal: float, country: str, settings: Any) -> float:
+    """Costo di spedizione: gratis oltre soglia, poi in base al paese (ISO-2)."""
+    if subtotal >= settings.free_shipping_min:
+        return 0.0
+    c = (country or "IT").upper()
+    if c in _NORDIC:
+        return 14.0
+    if c in _EUROPE:
+        return float(settings.default_shipping)
+    return 25.0
+
+
 def _price_index(products: list) -> dict[str, dict]:
     """Indice id → {name, price, stock} dal catalogo (Product o dict)."""
     index: dict[str, dict] = {}
@@ -138,7 +155,8 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
             items.append({"id": pid, "name": prod["name"], "price": prod["price"], "quantity": qty})
 
         subtotal = round(subtotal, 2)
-        shipping = 0.0 if subtotal >= settings.free_shipping_min else float(settings.default_shipping)
+        country = shipping_in.get("country") or "IT"
+        shipping = round(_compute_shipping(subtotal, country, settings), 2)
         total = round(subtotal + shipping, 2)
         currency = (settings.stripe_currency or "eur").upper()
         oid = _order_id()

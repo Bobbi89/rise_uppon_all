@@ -1,4 +1,5 @@
 import { Minus, Plus, Trash2 } from "lucide-react";
+import { localizeProduct, useI18n } from "../i18n";
 import type { CartItem } from "../types";
 import { formatMoney } from "../utils/money";
 import { Sheet } from "./Sheet";
@@ -26,15 +27,16 @@ export function CartSheet({
   onUpdate,
   onCheckout,
 }: Props) {
+  const { lang, t } = useI18n();
   const missingForFree = Math.max(0, freeShippingMin - subtotal);
 
   return (
-    <Sheet open={open} title="Il tuo carrello" onClose={onClose}>
+    <Sheet open={open} title={t("cartTitle")} onClose={onClose}>
       {items.length === 0 ? (
         <div className="px-5 pb-10 pt-6 text-center">
           <p className="text-4xl">🛒</p>
           <p className="mt-3 text-sm font-semibold text-olive-700">
-            Il carrello è vuoto. Scopri i nostri prodotti biologici!
+            {t("cartEmpty")}
           </p>
         </div>
       ) : (
@@ -44,12 +46,12 @@ export function CartSheet({
               <li key={item.product.id} className="flex items-center gap-3 py-3">
                 <img
                   src={item.product.image}
-                  alt={item.product.name}
+                  alt={localizeProduct(item.product, lang).name}
                   className="h-14 w-14 shrink-0 rounded-xl border border-olive-100 object-cover"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-[13px] font-bold leading-4 text-olive-900">
-                    {item.product.name}
+                    {localizeProduct(item.product, lang).name}
                   </p>
                   <p className="mt-1 text-sm font-extrabold text-olive-900">
                     {formatMoney(item.product.price * item.quantity)}
@@ -80,27 +82,27 @@ export function CartSheet({
 
           {missingForFree > 0 ? (
             <p className="mt-2 rounded-xl bg-gold/10 px-3 py-2 text-center text-[12px] font-bold text-clay">
-              Aggiungi {formatMoney(missingForFree)} per la spedizione gratuita 🚚
+              {t("addForFree", { amount: formatMoney(missingForFree) })}
             </p>
           ) : (
             <p className="mt-2 rounded-xl bg-olive-100 px-3 py-2 text-center text-[12px] font-bold text-olive-700">
-              🎉 Spedizione gratuita sbloccata!
+              {t("freeUnlocked")}
             </p>
           )}
 
           <dl className="mt-3 space-y-1.5 text-sm text-olive-700">
             <div className="flex justify-between">
-              <dt>Subtotale</dt>
+              <dt>{t("subtotal")}</dt>
               <dd className="font-bold text-olive-900">{formatMoney(subtotal)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt>Spedizione</dt>
+              <dt>{t("shipping")}</dt>
               <dd className="font-bold text-olive-900">
-                {shipping === 0 ? "Gratis" : formatMoney(shipping)}
+                {shipping === 0 ? t("free") : formatMoney(shipping)}
               </dd>
             </div>
             <div className="flex justify-between border-t border-olive-100 pt-2 text-base">
-              <dt className="font-bold text-olive-900">Totale</dt>
+              <dt className="font-bold text-olive-900">{t("total")}</dt>
               <dd className="font-extrabold text-olive-900">{formatMoney(total)}</dd>
             </div>
           </dl>
@@ -110,7 +112,7 @@ export function CartSheet({
               className="w-full rounded-full bg-olive-900 py-3.5 text-sm font-extrabold text-cream active:scale-[0.98]"
               onClick={onCheckout}
             >
-              Procedi al checkout · {formatMoney(total)}
+              {t("proceedCheckout")} · {formatMoney(total)}
             </button>
           </div>
         </div>

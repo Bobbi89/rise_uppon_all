@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, MapPin, Package, Trash2, Truck } from "lucide-react";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import type { ServerOrder } from "../types";
 import { formatMoney } from "../utils/money";
 import { Sheet } from "./Sheet";
@@ -10,24 +11,27 @@ type Props = {
   onClose: () => void;
 };
 
-const STATUS_LABEL: Record<string, { text: string; className: string }> = {
-  pending: { text: "Da pagare", className: "bg-gold/15 text-clay" },
-  awaiting_payment: { text: "PayPal in attesa", className: "bg-gold/15 text-clay" },
-  paid: { text: "Pagato", className: "bg-olive-100 text-olive-700" },
-  preparing: { text: "In preparazione", className: "bg-olive-100 text-olive-700" },
-  shipped: { text: "Spedito", className: "bg-olive-900 text-cream" },
-  delivered: { text: "Consegnato", className: "bg-olive-900 text-cream" },
-  cancelled: { text: "Annullato", className: "bg-clay/15 text-clay" },
+const STATUS_CLASS: Record<string, string> = {
+  pending: "bg-gold/15 text-clay",
+  awaiting_payment: "bg-gold/15 text-clay",
+  paid: "bg-olive-100 text-olive-700",
+  preparing: "bg-olive-100 text-olive-700",
+  shipped: "bg-olive-900 text-cream",
+  delivered: "bg-olive-900 text-cream",
+  cancelled: "bg-clay/15 text-clay",
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_LABEL[status] ?? { text: status, className: "bg-olive-100 text-olive-700" };
+  const { t } = useI18n();
+  const className = STATUS_CLASS[status] ?? "bg-olive-100 text-olive-700";
+  const text = t(`st_${status}`);
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${s.className}`}>{s.text}</span>
+    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${className}`}>{text}</span>
   );
 }
 
 export function ProfileSheet({ open, onClose }: Props) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orders, setOrders] = useState<ServerOrder[]>([]);
@@ -40,7 +44,7 @@ export function ProfileSheet({ open, onClose }: Props) {
     api
       .getProfile()
       .then((data) => setOrders(data.orders))
-      .catch((e) => setError(e.message || "Errore nel caricamento"))
+      .catch((e) => setError(e.message || t("loadError")))
       .finally(() => setLoading(false));
   }, [open]);
 
@@ -60,11 +64,11 @@ export function ProfileSheet({ open, onClose }: Props) {
   }
 
   return (
-    <Sheet open={open} title="I miei ordini" onClose={onClose}>
+    <Sheet open={open} title={t("myOrdersAria")} onClose={onClose}>
       <div className="px-5 pb-6">
         {loading && (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-olive-700">
-            <Loader2 size={18} className="animate-spin" /> Caricamento…
+            <Loader2 size={18} className="animate-spin" /> {t("loading")}
           </div>
         )}
 
@@ -75,7 +79,7 @@ export function ProfileSheet({ open, onClose }: Props) {
         {!loading && !error && orders.length === 0 && (
           <div className="py-10 text-center">
             <Package size={40} className="mx-auto text-olive-200" />
-            <p className="mt-3 text-sm font-semibold text-olive-700">Non hai ancora ordini.</p>
+            <p className="mt-3 text-sm font-semibold text-olive-700">{t("noOrders")}</p>
           </div>
         )}
 
@@ -86,7 +90,7 @@ export function ProfileSheet({ open, onClose }: Props) {
             className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-clay/30 bg-clay/5 py-2.5 text-[12px] font-bold text-clay active:scale-[0.99]"
           >
             {clearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-            Svuota ordini non pagati ({pendingCount})
+            {t("clearUnpaid", { n: pendingCount })}
           </button>
         )}
 
@@ -110,7 +114,7 @@ export function ProfileSheet({ open, onClose }: Props) {
                 ))}
               </ul>
               <div className="mt-2 flex items-center justify-between border-t border-olive-100 pt-2 text-sm">
-                <span className="text-olive-700">Totale</span>
+                <span className="text-olive-700">{t("total")}</span>
                 <span className="font-extrabold text-olive-900">{formatMoney(order.total)}</span>
               </div>
 
@@ -124,10 +128,10 @@ export function ProfileSheet({ open, onClose }: Props) {
               {order.tracking_code ? (
                 <div className="mt-2 rounded-xl bg-olive-50 px-3 py-2 text-[12px]">
                   <p className="flex items-center gap-1.5 font-bold text-olive-900">
-                    <Truck size={14} /> Spedito con {order.tracking_carrier}
+                    <Truck size={14} /> {t("shippedWith", { carrier: order.tracking_carrier ?? "" })}
                   </p>
                   <p className="mt-0.5 text-olive-700">
-                    Codice: <span className="font-mono font-bold">{order.tracking_code}</span>
+                    {t("trackCode")}: <span className="font-mono font-bold">{order.tracking_code}</span>
                   </p>
                   {order.tracking_url && (
                     <a
@@ -136,14 +140,14 @@ export function ProfileSheet({ open, onClose }: Props) {
                       rel="noreferrer"
                       className="mt-1 inline-block font-bold text-clay underline"
                     >
-                      Traccia la spedizione →
+                      {t("trackShipment")}
                     </a>
                   )}
                 </div>
               ) : (
                 order.status === "paid" && (
                   <p className="mt-2 text-[12px] font-semibold text-olive-400">
-                    In preparazione — riceverai il codice di tracking qui.
+                    {t("preparingNote")}
                   </p>
                 )
               )}

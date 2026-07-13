@@ -1,4 +1,5 @@
 import { CheckCircle2, Clock, Copy } from "lucide-react";
+import { useI18n } from "../i18n";
 import { formatMoney } from "../utils/money";
 import { Sheet } from "./Sheet";
 
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function SuccessSheet({ order, onClose }: Props) {
+  const { t } = useI18n();
   const isPaypal = !!(order && !order.paid && order.paypalEmail);
 
   function copyEmail() {
@@ -23,7 +25,7 @@ export function SuccessSheet({ order, onClose }: Props) {
   }
 
   return (
-    <Sheet open={order !== null} title={isPaypal ? "Ordine registrato" : "Ordine confermato"} onClose={onClose}>
+    <Sheet open={order !== null} title={isPaypal ? t("orderRegistered") : t("orderConfirmed")} onClose={onClose}>
       {order && (
         <div className="px-5 pb-6 text-center">
           {isPaypal ? (
@@ -31,24 +33,18 @@ export function SuccessSheet({ order, onClose }: Props) {
           ) : (
             <CheckCircle2 size={56} className="mx-auto text-olive-500" strokeWidth={1.5} />
           )}
-          <h3 className="mt-3 font-display text-2xl font-semibold text-olive-900">Grazie!</h3>
+          <h3 className="mt-3 font-display text-2xl font-semibold text-olive-900">{t("thanks")}</h3>
           <p className="mt-2 text-sm leading-6 text-olive-700">
-            Il tuo ordine <span className="font-extrabold text-olive-900">{order.id}</span> da{" "}
+            {t("yourOrder")} <span className="font-extrabold text-olive-900">{order.id}</span> {t("ofAmount")}{" "}
             <span className="font-extrabold text-olive-900">{formatMoney(order.total)}</span>{" "}
-            {order.paid ? (
-              <>è stato <b>pagato</b> con successo. Lo trovi in “I miei ordini” con lo stato e il tracking.</>
-            ) : isPaypal ? (
-              <>è stato registrato. Completa il pagamento su PayPal per confermarlo.</>
-            ) : (
-              <>è stato registrato. Ti contatteremo per completare il pagamento.</>
-            )}
+            {order.paid ? t("successPaid") : isPaypal ? t("successPaypal") : t("successPending")}
           </p>
 
           {isPaypal && (
             <div className="mt-4 rounded-2xl border border-olive-100 bg-white p-4 text-left">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gold">Pagamento PayPal</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-gold">{t("paypalPayment")}</p>
               <p className="mt-2 text-[13px] leading-5 text-olive-700">
-                Invia <b>{formatMoney(order.total)}</b> a questo account PayPal:
+                {t("paypalSendTo", { amount: formatMoney(order.total) })}
               </p>
               <button
                 onClick={copyEmail}
@@ -64,12 +60,11 @@ export function SuccessSheet({ order, onClose }: Props) {
                   rel="noreferrer"
                   className="mt-2 block w-full rounded-xl bg-[#0070ba] py-2.5 text-center text-[13px] font-extrabold text-white active:scale-[0.99]"
                 >
-                  Paga con PayPal.me
+                  {t("payWithPaypalMe")}
                 </a>
               )}
               <p className="mt-3 text-[11px] leading-4 text-olive-400">
-                Indica il numero d'ordine <b>{order.id}</b> nella causale. Confermeremo la spedizione
-                appena ricevuto il pagamento.
+                {t("paypalReference", { id: order.id })}
               </p>
             </div>
           )}
@@ -79,7 +74,7 @@ export function SuccessSheet({ order, onClose }: Props) {
               className="w-full rounded-full bg-olive-900 py-3.5 text-sm font-extrabold text-cream active:scale-[0.98]"
               onClick={onClose}
             >
-              Continua lo shopping
+              {t("continueShopping")}
             </button>
           </div>
         </div>

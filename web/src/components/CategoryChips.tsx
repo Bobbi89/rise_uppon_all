@@ -1,4 +1,5 @@
 import { categories } from "../data/products";
+import { localizeCategory, useI18n } from "../i18n";
 import type { CategoryFilter } from "../types";
 
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
 };
 
 export function CategoryChips({ active, onChange }: Props) {
+  const { lang } = useI18n();
   return (
     <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-1">
       {categories.map((category) => {
@@ -22,7 +24,7 @@ export function CategoryChips({ active, onChange }: Props) {
             }`}
           >
             <span className="mr-1">{category.emoji}</span>
-            {category.label}
+            {localizeCategory(category.id, lang)}
           </button>
         );
       })}

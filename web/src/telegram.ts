@@ -34,6 +34,7 @@ type TelegramWebApp = {
       first_name?: string;
       last_name?: string;
       username?: string;
+      language_code?: string;
     };
   };
 };
@@ -78,6 +79,11 @@ export function telegramUserName(): string | null {
 /** initData firmato da Telegram: autentica l'utente verso l'API. */
 export function telegramInitData(): string {
   return getTelegram()?.initData ?? "";
+}
+
+/** Codice lingua Telegram dell'utente (es. "it", "en-US"): serve come default. */
+export function telegramLanguageCode(): string | null {
+  return getTelegram()?.initDataUnsafe?.user?.language_code ?? null;
 }
 
 export function hapticError(): void {
