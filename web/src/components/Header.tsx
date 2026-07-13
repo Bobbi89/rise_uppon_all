@@ -1,4 +1,5 @@
-import { Leaf, Search, ShieldCheck, ShoppingBag, User } from "lucide-react";
+import { Globe, Leaf, Search, ShieldCheck, ShoppingBag, User } from "lucide-react";
+import { LANGS, useI18n } from "../i18n";
 
 type Props = {
   cartCount: number;
@@ -8,6 +9,7 @@ type Props = {
   onOpenCart: () => void;
   onOpenProfile: () => void;
   onOpenAdmin: () => void;
+  onOpenLang: () => void;
 };
 
 export function Header({
@@ -18,7 +20,10 @@ export function Header({
   onOpenCart,
   onOpenProfile,
   onOpenAdmin,
+  onOpenLang,
 }: Props) {
+  const { lang, t } = useI18n();
+  const flag = LANGS.find((l) => l.code === lang)?.flag ?? "🌐";
   return (
     <header className="sticky top-0 z-40 bg-olive-900 px-4 pb-3 pt-4 text-cream">
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
@@ -29,14 +34,22 @@ export function Header({
           <div className="leading-tight">
             <p className="font-display text-lg font-semibold tracking-wide">Oro Naturale</p>
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-gold-light">
-              Bio Marketplace
+              {t("tagline")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            aria-label={t("changeLang")}
+            className="flex h-10 items-center gap-1 rounded-full bg-olive-800 px-2.5 text-cream"
+            onClick={onOpenLang}
+          >
+            <Globe size={15} className="text-olive-200" />
+            <span className="text-sm leading-none">{flag}</span>
+          </button>
           {isAdmin && (
             <button
-              aria-label="Pannello admin"
+              aria-label={t("adminPanel")}
               className="grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-gold-light"
               onClick={onOpenAdmin}
             >
@@ -44,14 +57,14 @@ export function Header({
             </button>
           )}
           <button
-            aria-label="I miei ordini"
+            aria-label={t("myOrdersAria")}
             className="grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-cream"
             onClick={onOpenProfile}
           >
             <User size={18} />
           </button>
           <button
-            aria-label="Apri carrello"
+            aria-label={t("openCart")}
             className="relative grid h-10 w-10 place-items-center rounded-full bg-olive-800 text-cream"
             onClick={onOpenCart}
           >
@@ -69,7 +82,7 @@ export function Header({
         <input
           value={query}
           onChange={(event) => onQuery(event.target.value)}
-          placeholder="Cerca olio, vino, cosmetica…"
+          placeholder={t("search")}
           className="w-full bg-transparent text-sm text-cream placeholder:text-olive-200/70 focus:outline-none"
         />
       </div>

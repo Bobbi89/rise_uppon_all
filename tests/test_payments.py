@@ -303,6 +303,89 @@ def test_api_full_flow(clean_db, monkeypatch):
 
 
 @requires_db
+def test_api_paypal_and_shipping(clean_db, monkeypatch):
+    """Checkout PayPal (ordine 'awaiting_payment' + istruzioni) e spedizione a fasce."""
+    from aiohttp.test_utils import TestClient, TestServer
+
+    import oro_naturale.api as api
+
+    monkeypatch.setenv("DATABASE_URL", clean_db)
+    # Revolut disattivato: create_order non deve dipendere da esso per PayPal.
+    monkeypatch.setattr(api, "build_client", lambda sk, mode, ver=None: None)
+
+    async def run():
+        notifs = []
+
+        class FakeBot:
+            async def send_message(self, cid, text, **kw):
+                notifs.append((cid, text))
+
+        settings = SimpleNamespace(
+            telegram_bot_token=BOT_TOKEN, admin_chat_ids={42},
+            revolut_public_key="", revolut_secret_key="", revolut_mode="sandbox",
+            revolut_api_version="2024-09-01", stripe_currency="eur",
+            free_shipping_min=69.0, default_shipping=10.40,
+            paypal_email="shop@example.com", paypal_me="paypal.me/shop",
+        )
+        ctx = SimpleNamespace(settings=settings, products=[
+            {"id": "p1", "name": "Olio", "price": 12.95, "stock": 100},
+        ])
+
+        client = TestClient(TestServer(api.build_api(ctx, FakeBot())))
+        await client.start_server()
+        H = {"X-Init-Data": make_init_data({"id": 6001, "first_name": "Bobbi", "username": "bob"})}
+        AH = {"X-Init-Data": make_init_data({"id": 42, "first_name": "Admin"})}
+
+        # Ordine PayPal, Italia: 2×12.95=25.90 + 10.40 spedizione = 36.30
+        r = await client.post("/orders", headers=H, json={
+            "payment_method": "paypal",
+            "items": [{"id": "p1", "quantity": 2}],
+            "shipping": {"name": "Bobbi", "phone": "+39", "address": "Via Roma 1",
+                         "city": "Perugia", "zip": "06100", "country": "IT"},
+        })
+        o = await r.json()
+        assert r.status == 200
+        assert o["payment_method"] == "paypal"
+        assert o["subtotal"] == 25.90 and o["shipping"] == 10.40 and o["total"] == 36.30
+        assert o["paypal_email"] == "shop@example.com"
+        assert o["paypal_link"] == "https://paypal.me/shop/36.30EUR"
+        paypal_oid = o["order_id"]
+        # notifica admin "da confermare"
+        assert any(cid == 42 and "CONFERMARE" in txt for cid, txt in notifs)
+
+        # L'ordine è visibile all'admin come awaiting_payment
+        r = await client.get("/admin/orders", headers=AH)
+        admin_orders = (await r.json())["orders"]
+        row = next(x for x in admin_orders if x["id"] == paypal_oid)
+        assert row["status"] == "awaiting_payment"
+        assert row["items"][0]["quantity"] == 2  # l'admin vede cosa è stato ordinato
+
+        # "Segna pagato"
+        r = await client.post(f"/admin/orders/{paypal_oid}/status", headers=AH, json={"status": "paid"})
+        assert (await r.json())["order"]["status"] == "paid"
+
+        # Spedizione per paese: nordico 14€, extra-UE 25€, sopra soglia gratis
+        async def total_for(country, qty):
+            rr = await client.post("/orders", headers=H, json={
+                "payment_method": "paypal",
+                "items": [{"id": "p1", "quantity": qty}],
+                "shipping": {"country": country},
+            })
+            return await rr.json()
+
+        se = await total_for("SE", 2)   # 25.90 + 14 = 39.90
+        assert se["shipping"] == 14.0 and se["total"] == 39.90
+        us = await total_for("US", 2)   # 25.90 + 25 = 50.90
+        assert us["shipping"] == 25.0 and us["total"] == 50.90
+        free = await total_for("IT", 6)  # 77.70 >= 69 -> gratis
+        assert free["shipping"] == 0.0 and free["total"] == 77.70
+
+        await client.close()
+
+    asyncio.run(run())
+
+
+@requires_db
 def test_api_admin_set_status(clean_db, monkeypatch):
     from aiohttp.test_utils import TestClient, TestServer
 
@@ -423,3 +506,25 @@ def test_api_clear_pending_endpoint(clean_db, monkeypatch):
         await client.close()
 
     asyncio.run(run())
+
+
+# ─── Spedizioni a fasce (come biomarketshop.com) ────────────────────
+
+def test_compute_shipping_tiers():
+    from oro_naturale.api import _compute_shipping
+
+    settings = SimpleNamespace(free_shipping_min=69.0, default_shipping=10.40)
+
+    # Sopra soglia: sempre gratis (a prescindere dal paese)
+    assert _compute_shipping(69.0, "IT", settings) == 0.0
+    assert _compute_shipping(120.0, "US", settings) == 0.0
+    # Italia / Europa: tariffa standard
+    assert _compute_shipping(50.0, "IT", settings) == 10.40
+    assert _compute_shipping(50.0, "de", settings) == 10.40  # case-insensitive
+    # Paesi nordici: 14€
+    assert _compute_shipping(50.0, "SE", settings) == 14.0
+    assert _compute_shipping(50.0, "NO", settings) == 14.0
+    # Resto del mondo: 25€
+    assert _compute_shipping(50.0, "US", settings) == 25.0
+    # Paese assente -> default Italia
+    assert _compute_shipping(50.0, "", settings) == 10.40

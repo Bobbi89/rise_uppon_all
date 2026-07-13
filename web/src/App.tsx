@@ -5,19 +5,24 @@ import { CartSheet } from "./components/CartSheet";
 import { CategoryChips } from "./components/CategoryChips";
 import { CheckoutSheet, type PayChoice } from "./components/CheckoutSheet";
 import { Header } from "./components/Header";
+import { LanguageGate } from "./components/LanguageGate";
 import { ProductCard } from "./components/ProductCard";
 import { ProductSheet } from "./components/ProductSheet";
 import { ProfileSheet } from "./components/ProfileSheet";
 import { SuccessSheet } from "./components/SuccessSheet";
 import { products } from "./data/products";
+import { localizeProduct, storedLang, useI18n } from "./i18n";
 import { payWithRevolut } from "./revolut";
 import { haptic, hapticError, hapticSuccess, initTelegram, telegramUserName } from "./telegram";
-import type { CartItem, CategoryFilter, Product, ShippingDetails } from "./types";
+import type { CartItem, CategoryFilter, Lang, Product, ShippingDetails } from "./types";
 import { formatMoney } from "./utils/money";
-
-const DEFAULTS = { free_shipping_min: 100, default_shipping: 14 };
+import { FREE_SHIPPING_MIN, shippingFor } from "./utils/shipping";
 
 export default function App() {
+  const { lang, setLang, t } = useI18n();
+  // Mostra la scelta lingua all'avvio se l'utente non ne ha ancora scelta una.
+  const [langChosen, setLangChosen] = useState<boolean>(() => storedLang() !== null);
+
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -43,23 +48,25 @@ export default function App() {
     api.getConfig().then(setConfig).catch(() => setConfig(null));
   }, []);
 
-  const freeShippingMin = config?.free_shipping_min ?? DEFAULTS.free_shipping_min;
-  const defaultShipping = config?.default_shipping ?? DEFAULTS.default_shipping;
+  const freeShippingMin = FREE_SHIPPING_MIN;
 
   const filteredProducts = useMemo(() => {
     const term = query.trim().toLowerCase();
     return products.filter((product) => {
       if (category !== "all" && product.category !== category) return false;
       if (!term) return true;
+      const loc = localizeProduct(product, lang);
       return (
-        product.name.toLowerCase().includes(term) ||
-        product.description.toLowerCase().includes(term)
+        loc.name.toLowerCase().includes(term) ||
+        loc.description.toLowerCase().includes(term) ||
+        product.name.toLowerCase().includes(term)
       );
     });
-  }, [category, query]);
+  }, [category, query, lang]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shipping = cart.length === 0 || subtotal >= freeShippingMin ? 0 : defaultShipping;
+  // Stima Italia; al checkout viene ricalcolata in base al paese scelto.
+  const shipping = cart.length === 0 ? 0 : shippingFor(subtotal, "IT");
   const total = subtotal + shipping;
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -126,12 +133,12 @@ export default function App() {
         finishOrder(created.order_id, created.total, true);
       } else {
         hapticError();
-        setCheckoutError("Pagamento non confermato. Riprova o contattaci.");
+        setCheckoutError(t("paymentNotConfirmed"));
         setProcessing(false);
       }
     } catch (e) {
       hapticError();
-      setCheckoutError((e as Error).message || "Errore durante il pagamento.");
+      setCheckoutError((e as Error).message || t("paymentError"));
       setProcessing(false);
     }
   }
@@ -162,6 +169,16 @@ export default function App() {
     adminOpen ||
     confirmedOrder !== null;
 
+  function chooseLang(next: Lang) {
+    setLang(next);
+    setLangChosen(true);
+  }
+
+  // Schermata iniziale di scelta lingua (prima di aprire il negozio).
+  if (!langChosen) {
+    return <LanguageGate initial={lang} onConfirm={chooseLang} />;
+  }
+
   return (
     <div className="mx-auto min-h-dvh max-w-lg bg-cream font-body text-olive-900">
       <Header
@@ -172,6 +189,7 @@ export default function App() {
         onOpenCart={() => setCartOpen(true)}
         onOpenProfile={() => setProfileOpen(true)}
         onOpenAdmin={() => setAdminOpen(true)}
+        onOpenLang={() => setLangChosen(false)}
       />
 
       <main className="px-4 pb-28 pt-3">
@@ -184,14 +202,14 @@ export default function App() {
         />
 
         <p className="mt-2 text-[12px] font-semibold text-olive-400">
-          {filteredProducts.length} prodotti · Spedizione gratis da {formatMoney(freeShippingMin)}
+          {filteredProducts.length} {t("products")} · {t("freeShipFrom", { min: formatMoney(freeShippingMin) })}
         </p>
 
         {filteredProducts.length === 0 ? (
           <div className="mt-14 text-center">
             <p className="text-4xl">🌿</p>
             <p className="mt-3 text-sm font-semibold text-olive-700">
-              Nessun prodotto trovato. Prova un'altra ricerca.
+              {t("noResults")}
             </p>
           </div>
         ) : (
@@ -213,7 +231,7 @@ export default function App() {
         )}
 
         <footer className="mt-10 pb-4 text-center text-[11px] leading-5 text-olive-400">
-          Oro Naturale SRL · Prodotti biologici italiani
+          Oro Naturale SRL · {t("footerLine")}
           <br />
           biomarketshop.com
         </footer>
@@ -225,7 +243,7 @@ export default function App() {
             className="flex w-full items-center justify-between rounded-full bg-olive-900 px-5 py-3.5 text-sm font-extrabold text-cream shadow-bar active:scale-[0.98]"
             onClick={() => setCartOpen(true)}
           >
-            <span>🛒 Carrello · {cartCount} {cartCount === 1 ? "articolo" : "articoli"}</span>
+            <span>🛒 {t("cartWord")} · {cartCount} {cartCount === 1 ? t("itemOne") : t("itemMany")}</span>
             <span>{formatMoney(total)}</span>
           </button>
         </div>
@@ -252,7 +270,7 @@ export default function App() {
       <CheckoutSheet
         open={checkoutOpen}
         items={cart}
-        total={total}
+        subtotal={subtotal}
         defaultName={telegramUserName() ?? undefined}
         processing={processing}
         error={checkoutError}

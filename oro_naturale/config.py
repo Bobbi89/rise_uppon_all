@@ -133,9 +133,9 @@ def load_settings() -> Settings:
         products_csv=os.getenv("PRODUCTS_CSV", "Product_export.csv"),
         data_dir=os.getenv("DATA_DIR", "data"),
         
-        # Spedizioni e Promozioni (Defaults adatti a negozio fisico)
-        free_shipping_min=float(os.getenv("FREE_SHIPPING_MIN", "50.00")),
-        default_shipping=float(os.getenv("DEFAULT_SHIPPING", "4.90")),
+        # Spedizioni (allineate a biomarketshop.com: gratis da 69€, standard EU 10,40€)
+        free_shipping_min=float(os.getenv("FREE_SHIPPING_MIN", "69.00")),
+        default_shipping=float(os.getenv("DEFAULT_SHIPPING", "10.40")),
         b2b_discount=float(os.getenv("B2B_DISCOUNT", "15.0")),
         
         # Pagamenti

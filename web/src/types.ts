@@ -7,6 +7,9 @@ export type CategoryId =
 
 export type CategoryFilter = CategoryId | "all";
 
+/** Lingue supportate dalla Mini App. `it` è la lingua base del catalogo. */
+export type Lang = "it" | "en" | "ro" | "es";
+
 export type Category = {
   id: CategoryFilter;
   label: string;
@@ -25,6 +28,8 @@ export type Product = {
   tags?: string[];
   featured?: boolean;
   stock: number;
+  /** Traduzioni nome/descrizione (base italiana nei campi principali). */
+  translations?: Partial<Record<Exclude<Lang, "it">, { name: string; description: string }>>;
 };
 
 export type CartItem = {
@@ -53,6 +58,8 @@ export type ShippingDetails = {
   address: string;
   city: string;
   zip: string;
+  /** Codice paese ISO-2 (es. "IT"): determina il costo di spedizione. */
+  country: string;
   notes?: string;
 };
 

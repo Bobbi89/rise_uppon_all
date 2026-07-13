@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Minus, Plus, ShoppingBag } from "lucide-react";
+import { localizeProduct, useI18n } from "../i18n";
 import type { Product } from "../types";
 import { formatMoney } from "../utils/money";
 import { Sheet } from "./Sheet";
@@ -11,23 +12,26 @@ type Props = {
 };
 
 export function ProductSheet({ product, onClose, onAdd }: Props) {
+  const { lang, t } = useI18n();
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     setQuantity(1);
   }, [product?.id]);
 
+  const loc = product ? localizeProduct(product, lang) : null;
+
   return (
-    <Sheet open={product !== null} title="Dettaglio prodotto" onClose={onClose}>
-      {product && (
+    <Sheet open={product !== null} title={t("productDetail")} onClose={onClose}>
+      {product && loc && (
         <div className="px-5 pb-5">
           <div className="overflow-hidden rounded-2xl bg-olive-50">
-            <img src={product.image} alt={product.name} className="aspect-square w-full object-cover" />
+            <img src={product.image} alt={loc.name} className="aspect-square w-full object-cover" />
           </div>
 
           <div className="mt-4 flex items-start justify-between gap-3">
             <h3 className="font-display text-xl font-semibold leading-snug text-olive-900">
-              {product.name}
+              {loc.name}
             </h3>
             <span className="shrink-0 text-xl font-extrabold text-olive-900">
               {formatMoney(product.price)}
@@ -49,7 +53,7 @@ export function ProductSheet({ product, onClose, onAdd }: Props) {
             </div>
           )}
 
-          <p className="mt-3 text-sm leading-6 text-olive-700">{product.description}</p>
+          <p className="mt-3 text-sm leading-6 text-olive-700">{loc.description}</p>
 
           {product.tags && product.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -88,7 +92,7 @@ export function ProductSheet({ product, onClose, onAdd }: Props) {
               onClick={() => onAdd(product, quantity)}
             >
               <ShoppingBag size={16} />
-              Aggiungi · {formatMoney(product.price * quantity)}
+              {t("add")} · {formatMoney(product.price * quantity)}
             </button>
           </div>
         </div>
