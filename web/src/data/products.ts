@@ -330,6 +330,11 @@ export const products: Product[] = [
     description: "Prestigioso Montefalco Sagrantino DOCG, vino rosso corposo e strutturato dalle colline umbre. Invecchiamento in botte, carattere intenso.",
     origin: "Montefalco, Umbria",
     stock: 15,
+    translations: {
+      en: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestigious Montefalco Sagrantino DOCG, a full-bodied and structured red wine from the Umbrian hills. Barrel-aged, with an intense character." },
+      ro: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestigiosul Montefalco Sagrantino DOCG, un vin roșu corpolent și structurat de pe colinele umbriene. Maturat în butoi, cu un caracter intens." },
+      es: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestigioso Montefalco Sagrantino DOCG, un vino tinto con cuerpo y estructurado de las colinas de Umbría. Envejecido en barrica, de carácter intenso." },
+    },
   },
   {
     id: "690f13c369e3610ea9b1e190",
@@ -341,6 +346,11 @@ export const products: Product[] = [
     volume: "500",
     origin: "Italia",
     stock: 30,
+    translations: {
+      en: { name: "Mamma Mia - Passito Wine", description: "Sweet and aromatic passito wine, carefully aged. Perfect with desserts and mature cheeses. A meditation wine." },
+      ro: { name: "Mamma Mia - Vin Passito", description: "Vin passito dulce și aromat, maturat cu grijă. Perfect pentru deserturi și brânzeturi maturate. Un vin de meditație." },
+      es: { name: "Mamma Mia - Vino Passito", description: "Vino passito dulce y aromático, envejecido con esmero. Perfecto para postres y quesos curados. Un vino de meditación." },
+    },
   },
   {
     id: "690f13c369e3610ea9b1e192",
@@ -382,6 +392,11 @@ export const products: Product[] = [
     description: "Spumante Brut metodo classico. Bollicine fini e persistenti, elegante e raffinato. Perfetto per aperitivi e celebrazioni.",
     origin: "Italia",
     stock: 35,
+    translations: {
+      en: { name: "Sparkling Brut 1742", description: "Classic-method Brut sparkling wine. Fine and persistent bubbles, elegant and refined. Perfect for aperitifs and celebrations." },
+      ro: { name: "Spumant Brut 1742", description: "Spumant Brut metoda clasică. Bule fine și persistente, elegant și rafinat. Perfect pentru aperitive și sărbători." },
+      es: { name: "Espumoso Brut 1742", description: "Espumoso Brut método clásico. Burbujas finas y persistentes, elegante y refinado. Perfecto para aperitivos y celebraciones." },
+    },
   },
   {
     id: "690f13c369e3610ea9b1e18e",
@@ -392,6 +407,11 @@ export const products: Product[] = [
     description: "Vino rosso Cabernet Franc di qualità superiore dalle migliori cantine italiane. Corposo e strutturato, con note di frutti rossi.",
     origin: "Italia",
     stock: 40,
+    translations: {
+      en: { name: "Cabernet Franc", description: "Superior-quality Cabernet Franc red wine from the finest Italian wineries. Full-bodied and structured, with notes of red fruits." },
+      ro: { name: "Cabernet Franc", description: "Vin roșu Cabernet Franc de calitate superioară de la cele mai bune crame italiene. Corpolent și structurat, cu note de fructe roșii." },
+      es: { name: "Cabernet Franc", description: "Vino tinto Cabernet Franc de calidad superior de las mejores bodegas italianas. Con cuerpo y estructurado, con notas de frutos rojos." },
+    },
   },
   {
     id: "690f13c369e3610ea9b1e199",
