@@ -8,7 +8,7 @@ export type CategoryId =
 export type CategoryFilter = CategoryId | "all";
 
 /** Lingue supportate dalla Mini App. `it` è la lingua base del catalogo. */
-export type Lang = "it" | "en" | "ro" | "es";
+export type Lang = "it" | "en" | "ro" | "es" | "no";
 
 export type Category = {
   id: CategoryFilter;

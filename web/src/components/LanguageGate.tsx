@@ -14,18 +14,21 @@ const TITLE: Record<Lang, string> = {
   en: "Choose your language",
   ro: "Alege limba",
   es: "Elige el idioma",
+  no: "Velg språk",
 };
 const SUBTITLE: Record<Lang, string> = {
   it: "Benvenuto in Oro Naturale",
   en: "Welcome to Oro Naturale",
   ro: "Bine ai venit la Oro Naturale",
   es: "Bienvenido a Oro Naturale",
+  no: "Velkommen til Oro Naturale",
 };
 const CONTINUE: Record<Lang, string> = {
   it: "Continua",
   en: "Continue",
   ro: "Continuă",
   es: "Continuar",
+  no: "Fortsett",
 };
 
 /** Schermata iniziale di scelta lingua (EN / IT / RO / ES). */
