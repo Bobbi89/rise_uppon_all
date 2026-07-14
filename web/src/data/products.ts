@@ -25,6 +25,7 @@ export const products: Product[] = [
     featured: true,
     stock: 50,
     translations: {
+      no: { name: "Ekstra Virgin Olivenolje 'ORO' 5L", description: "Italiensk ekstra virgin olivenolje fra åsene i Subasio. En naturlig og ekte EVO, kaldpresset, med en balansert og allsidig smak, ideell både rå og til matlaging. I praktisk 5-liters format er den det perfekte valget for familier og restauranter som ser etter kvalitet, bekvemmelighet og umbrisk autentisitet." },
       en: { name: "Extra Virgin Olive Oil 'ORO' 5L", description: "Italian extra virgin olive oil from the hills of Subasio. A natural and genuine EVO, cold-pressed, with a balanced and versatile flavor, ideal both raw and for cooking. In a practical 5-liter format, it’s the perfect choice for families and restaurateurs looking for quality, convenience, and Umbrian authenticity." },
       ro: { name: "Ulei de măsline extravirgin 'ORO' 5L", description: "Ulei de măsline extravirgin italian, provenit din colinele Subasio. Un EVO natural și autentic, extras la rece, cu un gust echilibrat și versatil, ideal atât crud, cât și pentru gătit. În formatul practic de 5 litri, este alegerea perfectă pentru familii și restaurante care caută calitate, conveniență și autenticitate umbriană." },
       es: { name: "Aceite de Oliva Virgen Extra 'ORO' 5L", description: "Aceite de oliva virgen extra italiano, de las colinas del Subasio. Un EVO natural y genuino, extraído en frío, con un sabor equilibrado y versátil, ideal tanto en crudo como para cocinar. En un práctico formato de 5 litros, es la elección perfecta para familias y restauradores que buscan calidad, conveniencia y autenticidad de Umbría." },
@@ -42,6 +43,7 @@ export const products: Product[] = [
     featured: true,
     stock: 30,
     translations: {
+      no: { name: "Premium EVO-olje 'Sien Die' 750ml", description: "Ekstra virgin olivenolje av høyeste kvalitet, produsert i begrensede mengder. Aromatisk og intens, med hint av friske urter og mandel, ideell til gourmetretter, crudités, edelt kjøtt og salater. Valgt av kokker og entusiaster for sin autentiske smak og prisbelønte kvalitet." },
       en: { name: "Premium EVO Oil 'Sien Die' 750ml", description: "Superior quality extra virgin olive oil, produced in limited quantities. Aromatic and intense, with notes of fresh herbs and almond, ideal for gourmet dishes, crudités, premium meats, and salads. Chosen by chefs and enthusiasts for its authentic flavor and award-winning quality." },
       ro: { name: "Ulei EVO Premium 'Sien Die' 750ml", description: "Ulei de măsline extravirgin de calitate superioară, produs în cantități limitate. Aromat și intens, cu note de ierburi proaspete și migdale, ideal pentru preparate gourmet, crudités, carne de calitate și salate. Alegerea bucătarilor și pasionaților pentru gustul său autentic și calitatea premiată." },
       es: { name: "Aceite EVO Premium 'Sien Die' 750ml", description: "Aceite de oliva virgen extra de calidad superior, producido en cantidades limitadas. Aromático e intenso, con notas de hierbas frescas y almendra, ideal para platos gourmet, crudités, carnes selectas y ensaladas. Elegido por chefs y aficionados por su sabor auténtico y calidad premiada." },
@@ -58,6 +60,7 @@ export const products: Product[] = [
     origin: "Umbria, Italia",
     stock: 30,
     translations: {
+      no: { name: "Premium EVO-olje 'DOC' 500ml", description: "DOC ekstra virgin olivenolje av høyeste kvalitet. Premiumutvalg med sertifisert kontrollert opprinnelse. Ideell til forfinede retter og kresne ganer." },
       en: { name: "Premium EVO Oil 'DOC' 500ml", description: "Superior quality DOC extra virgin olive oil. Premium selection with controlled origin certification. Ideal for refined dishes and sophisticated palates." },
       ro: { name: "Ulei EVO Premium 'DOC' 500ml", description: "Ulei de măsline extravirgin DOC de calitate superioară. Selecție premium cu certificare de origine controlată. Ideal pentru preparate rafinate și pentru gusturi sofisticate." },
       es: { name: "Aceite EVO Premium 'DOC' 500ml", description: "Aceite de oliva virgen extra DOC de calidad superior. Selección premium con certificación de origen controlado. Ideal para platos refinados y paladares exigentes." },
@@ -74,6 +77,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 60,
     translations: {
+      no: { name: "Økologisk Ekstra Virgin Olivenolje 500ml", description: "Sertifisert økologisk ekstra virgin olivenolje. Dyrket med naturlige metoder, uten plantevernmidler eller kjemisk gjødsel. Italiensk renhet og autentisitet i hver dråpe." },
       en: { name: "Organic Extra Virgin Olive Oil 500ml", description: "Certified organic extra virgin olive oil. Cultivated using natural methods, without pesticides or chemical fertilizers. Italian purity and authenticity in every drop." },
       ro: { name: "Ulei de măsline extravirgin bio 500ml", description: "Ulei de măsline extravirgin bio certificat. Cultivat prin metode naturale, fără pesticide sau îngrășăminte chimice. Puritate și autenticitate italiană în fiecare picătură." },
       es: { name: "Aceite de Oliva Virgen Extra Ecológico 500ml", description: "Aceite de oliva virgen extra orgánico certificado. Cultivado con métodos naturales, sin pesticidas ni fertilizantes químicos. Pureza y autenticidad italiana en cada gota." },
@@ -91,6 +95,7 @@ export const products: Product[] = [
     featured: true,
     stock: 100,
     translations: {
+      no: { name: "Økologisk EVO Blend Ronci 500ml", description: "Premium økologisk ekstra virgin olivenolje-blanding. Balansert og allsidig smak, perfekt til daglig bruk. Økologisk sertifisert." },
       en: { name: "Organic EVO Blend Ronci 500ml", description: "Premium organic extra virgin olive oil blend. Balanced and versatile flavor, perfect for daily use. Organic certified." },
       ro: { name: "Blend Organic EVO Ronci 500ml", description: "Amestec premium de ulei de măsline extravirgin organic. Gust echilibrat și versatil, perfect pentru uz zilnic. Certificat organic." },
       es: { name: "Blend Orgánico EVO Ronci 500ml", description: "Mezcla de aceite de oliva virgen extra orgánico premium. Sabor equilibrado y versátil, perfecto para uso diario. Certificado orgánico." },
@@ -107,6 +112,7 @@ export const products: Product[] = [
     origin: "Umbria, Italia",
     stock: 40,
     translations: {
+      no: { name: "Monocultivar Frantoio Ekstra Virgin Olivenolje 500ml", description: "Monocultivar ekstra virgin olivenolje av Frantoio-oliven. Delikat og aromatisk, med hint av friskt gress og artisjokk. Utmerket til fisk og grønnsaker." },
       en: { name: "Monocultivar Frantoio Extra Virgin Olive Oil 500ml", description: "Monocultivar extra virgin olive oil from Frantoio olives. Delicate and aromatic, with hints of fresh grass and artichoke. Excellent on fish and vegetables." },
       ro: { name: "Ulei de măsline extravirgin Monocultivar Frantoio 500ml", description: "Ulei de măsline extravirgin monocultivar din măsline Frantoio. Delicat și aromat, cu note de iarbă proaspătă și anghinare. Excelent pentru pește și legume." },
       es: { name: "Aceite de Oliva Virgen Extra Monovarietal Frantoio 500ml", description: "Aceite de oliva virgen extra monovarietal de aceitunas Frantoio. Delicado y aromático, con notas de hierba fresca y alcachofa. Excelente para pescados y verduras." },
@@ -123,6 +129,7 @@ export const products: Product[] = [
     origin: "Umbria, Italia",
     stock: 40,
     translations: {
+      no: { name: "Monocultivar Moraiolo Ekstra Virgin Olivenolje 500ml", description: "Monocultivar ekstra virgin olivenolje av Moraiolo-oliven. Intens og markant smak, med fruktige noter. Perfekt til bruschetta og kraftige retter. En naturlig, kaldpresset olje." },
       en: { name: "Monocultivar Moraiolo Extra Virgin Olive Oil 500ml", description: "Monocultivar extra virgin olive oil from Moraiolo olives. Intense and bold flavor, with fruity notes. Perfect for bruschetta and hearty dishes. A natural, cold-pressed oil." },
       ro: { name: "Ulei de măsline extravirgin Monocultivar Moraiolo 500ml", description: "Ulei de măsline extravirgin monocultivar din măsline Moraiolo. Gust intens și puternic, cu note fructate. Perfect pentru bruschette și preparate consistente. Un ulei natural extras la rece." },
       es: { name: "Aceite de Oliva Virgen Extra Monovarietal Moraiolo 500ml", description: "Huile d’olive vierge extra monovariétale à partir d’olives Moraiolo. Saveur intense et prononcée, avec des notes fruitées. Parfaite pour les bruschetta et les plats robustes. Une huile naturelle extraite à froid." },
@@ -140,6 +147,7 @@ export const products: Product[] = [
     featured: true,
     stock: 100,
     translations: {
+      no: { name: "Ekstra Virgin Olivenolje 'ROSSI' 500ml", description: "Rossi 100 % italiensk ekstra virgin olivenolje: en fortreffelighet laget av Leccino-, Moraiolo- og Frantoio-oliven, håndplukket for å bevare kvalitet og integritet. En naturlig og ekte italiensk olje, ideell både ved bordet og på kjøkkenet, perfekt til matlaging takket være sin balanserte smak og overlegne kvalitet." },
       en: { name: "Extra Virgin Olive Oil 'ROSSI' 500ml", description: "Rossi 100% Italian extra virgin olive oil: an excellence made from Leccino, Moraiolo, and Frantoio olives, hand-picked to preserve quality and integrity. A natural and genuine Italian oil, ideal both at the table and in the kitchen, perfect for cooking thanks to its balanced flavor and superior quality." },
       ro: { name: "Ulei de măsline extravirgin 'ROSSI' 500ml", description: "Ulei de măsline extravirgin Rossi 100 % italian: o excelență obținută din măslinele Leccino, Moraiolo și Frantoio, culese manual pentru a le păstra calitatea și integritatea. Un ulei italian natural și autentic, ideal atât la masă, cât și în bucătărie, perfect și pentru gătit datorită gustului său echilibrat și calității superioare." },
       es: { name: "Aceite de Oliva Virgen Extra 'ROSSI' 500ml", description: "Aceite de oliva virgen extra Rossi 100 % italiano: una excelencia obtenida de aceitunas Leccino, Moraiolo y Frantoio, recolectadas a mano para preservar su calidad e integridad. Un aceite italiano natural y genuino, ideal tanto en la mesa como en la cocina, perfecto para cocinar gracias a su sabor equilibrado y su calidad superior." },
@@ -156,6 +164,7 @@ export const products: Product[] = [
     origin: "Umbria, Italia",
     stock: 50,
     translations: {
+      no: { name: "Monocultivar Frantoio Ekstra Virgin Olivenolje 250ml", description: "Monocultivar ekstra virgin olivenolje av Frantoio-oliven. Delikat og aromatisk, med hint av friskt gress og artisjokk. Utmerket til fisk og grønnsaker." },
       en: { name: "Monocultivar Frantoio Extra Virgin Olive Oil 250ml", description: "Monocultivar extra virgin olive oil from Frantoio olives. Delicate and aromatic, with hints of fresh grass and artichoke. Excellent on fish and vegetables." },
       ro: { name: "Ulei de măsline extravirgin Monocultivar Frantoio 250ml", description: "Ulei de măsline extravirgin monocultivar din măsline Frantoio. Delicat și aromat, cu note de iarbă proaspătă și anghinare. Excelent pentru pește și legume." },
       es: { name: "Aceite de Oliva Virgen Extra Monovarietal Frantoio 250ml", description: "Aceite de oliva virgen extra monovarietal de aceitunas Frantoio. Delicado y aromático, con notas de hierba fresca y alcachofa. Excelente para pescados y verduras." },
@@ -172,6 +181,7 @@ export const products: Product[] = [
     origin: "Umbria, Italia",
     stock: 50,
     translations: {
+      no: { name: "Monocultivar Moraiolo Ekstra Virgin Olivenolje 250ml", description: "Monocultivar ekstra virgin olivenolje av Moraiolo-oliven. Intens og markant smak, med fruktige noter. Perfekt til bruschetta og kraftige retter. En naturlig, kaldpresset olje." },
       en: { name: "English: Monocultivar Moraiolo Extra Virgin Olive Oil 250ml", description: "Monocultivar extra virgin olive oil from Moraiolo olives. Intense and bold flavor, with fruity notes. Perfect for bruschetta and hearty dishes. A natural, cold-pressed oil." },
       ro: { name: "Ulei de măsline extravirgin Monocultivar Moraiolo 250ml", description: "Ulei de măsline extravirgin monocultivar din măsline Moraiolo. Gust intens și puternic, cu note fructate. Perfect pentru bruschette și preparate consistente. Un ulei natural extras la rece." },
       es: { name: "Aceite de Oliva Virgen Extra Monovarietal Moraiolo 250ml", description: "Aceite de oliva virgen extra monovarietal de aceitunas Moraiolo. Sabor intenso y decidido, con notas afrutadas. Perfecto para bruschettas y platos contundentes. Un aceite natural extraído en frío." },
@@ -188,6 +198,7 @@ export const products: Product[] = [
     origin: "Umbria, Italia",
     stock: 100,
     translations: {
+      no: { name: "Ekstra Virgin Olivenolje 'ORO' 250ml", description: "ORO ekstra virgin olivenolje i lommeformat på 250ml. Perfekt til smaksprøver, gaver eller for dem som vil prøve Oro Naturale-kvalitet." },
       en: { name: "Extra Virgin Olive Oil 'ORO' 250ml", description: "ORO extra virgin olive oil in pocket-sized 250ml format. Perfect for tastings, gifts or for those who want to try Oro Naturale quality." },
       ro: { name: "Ulei de Măsline Extravirgin 'ORO' 250ml", description: "Ulei de măsline extravirgin ORO în format de buzunar de 250ml. Perfect pentru degustări, cadouri sau pentru cei care doresc să încerce calitatea Oro Naturale." },
       es: { name: "Aceite de Oliva Virgen Extra 'ORO' 250ml", description: "Aceite de oliva virgen extra ORO en formato de bolsillo de 250ml. Perfecto para degustaciones, regalos o para quien quiera probar la calidad de Oro Naturale." },
@@ -204,6 +215,7 @@ export const products: Product[] = [
     origin: "Sicilia Italia",
     stock: 5,
     translations: {
+      no: { name: "Avo – 100 % Italiensk Avokadoolje fra Sicilia", description: "Laget av utvalgte avokadoer dyrket i skråningene av Etna, rik på sunt fett, omega-3 og vitamin E og D. En italiensk fortreffelighet med delikat smak og naturlige gunstige egenskaper." },
       en: { name: "Avo – 100% Italian Avocado Oil from Sicily.", description: "Made from selected avocados grown on the slopes of Mount Etna, it’s rich in healthy fats, omega-3, and vitamins E and D. An Italian excellence with a delicate taste and natural beneficial properties." },
       ro: { name: "Avo – Ulei de Avocado din Sicilia 100 % Italian.", description: "Obținut din avocado selecționat, cultivat pe versanții Etnei, este bogat în grăsimi sănătoase, omega-3 și vitaminele E și D. O excelență italiană cu gust delicat și proprietăți naturale benefice." },
       es: { name: "Avo – Aceite de Aguacate de Sicilia 100 % Italiano.", description: "Elaborado con aguacates seleccionados cultivados en las laderas del Etna, es rico en grasas saludables, omega-3 y vitaminas E y D. Una excelencia italiana con sabor delicado y beneficios naturales." },
@@ -220,6 +232,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 65,
     translations: {
+      no: { name: "EVO Sitronolje 100ml", description: "Håndlaget EVO Sitronolje 100 % italiensk. Friske sitrusnoter, perfekt til fisk og salater." },
       en: { name: "EVO Lemon Oil 100ml", description: "Artisan EVO Lemon Oil 100% Italian. Fresh citrus notes, perfect for fish and salads." },
       ro: { name: "Ulei EVO cu Lămâie 100ml", description: "Ulei EVO artizanal cu lămâie 100% italian. Note proaspete de citrice, perfect pentru pește și salate." },
       es: { name: "Aceite EVO al Limón 100ml", description: "Aceite EVO artesanal al limón 100% italiano. Notas cítricas frescas, perfecto para pescado y ensaladas." },
@@ -236,6 +249,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 55,
     translations: {
+      no: { name: "EVO Appelsinolje 100ml", description: "Håndlaget EVO Appelsinolje 100 % italiensk. Søt og sitrusaktig, ideell til salater, desserter og kreative retter." },
       en: { name: "EVO Orange Oil 100ml", description: "Artisan EVO Orange Oil 100% Italian. Sweet and citrusy, ideal for salads, desserts and creative dishes." },
       ro: { name: "Ulei EVO cu Portocală 100ml", description: "Ulei EVO artizanal cu portocală 100% italian. Dulce și citric, ideal pentru salate, deserturi și preparate creative." },
       es: { name: "Aceite EVO a la Naranja 100ml", description: "Aceite EVO artesanal a la naranja 100% italiano. Dulce y cítrico, ideal para ensaladas, postres y platos creativos." },
@@ -252,6 +266,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 60,
     translations: {
+      no: { name: "EVO Trøffelolje 100ml", description: "100 % italiensk EVO Trøffelolje. Intens og forfinet aroma, perfekt til pastaretter, risotto og gourmetkreasjoner." },
       en: { name: "Truffle Flavoured EVO Oil 100ml", description: "100% Italian Truffle Flavoured EVO Oil. Intense and refined aroma, perfect for pasta dishes, risottos, and gourmet creations." },
       ro: { name: "Ulei EVO cu aromă de Trufă 100ml", description: "Ulei EVO cu Trufă 100 % Italian. Aromă intensă și rafinată, perfect pentru paste, risotto și preparate gourmet." },
       es: { name: "Aceite EVO con Trufa 100ml", description: "Aceite EVO con Trufa 100 % Italiano. Aroma intenso y refinado, perfecto para pastas, risottos y platos gourmet." },
@@ -268,6 +283,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 70,
     translations: {
+      no: { name: "EVO Basilikumolje 100ml", description: "Håndlaget EVO Basilikumolje 100 % italiensk. Frisk og aromatisk, ideell til Caprese og middelhavsretter." },
       en: { name: "EVO Basil Oil 100ml", description: "Artisan EVO Basil Oil 100% Italian. Fresh and aromatic, ideal for Caprese and Mediterranean dishes." },
       ro: { name: "Ulei EVO cu Busuioc 100ml", description: "Ulei EVO artizanal cu busuioc 100% italian. Proaspăt și aromat, ideal pentru Caprese și preparate mediteraneene." },
       es: { name: "Aceite EVO al Albahaca 100ml", description: "Aceite EVO artesanal al albahaca 100% italiano. Fresco y aromático, ideal para Caprese y platos mediterráneos." },
@@ -284,6 +300,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 80,
     translations: {
+      no: { name: "EVO Chiliolje 100ml", description: "Håndlaget EVO Chiliolje 100 % italiensk. Sterk og markant, perfekt til pasta og pizza." },
       en: { name: "EVO Chili Pepper Oil 100ml", description: "Artisan EVO Chili Oil 100% Italian. Spicy and bold, perfect for pasta and pizza." },
       ro: { name: "Ulei EVO cu Ardei Iute 100ml", description: "Ulei EVO artizanal cu ardei iute 100% italian. Picant și îndrăzneț, perfect pentru paste și pizza." },
       es: { name: "Aceite EVO al Guindilla 100ml", description: "Aceite EVO artesanal a la guindilla 100% italiano. Picante y audaz, perfecto para pasta y pizza." },
@@ -300,6 +317,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 70,
     translations: {
+      no: { name: "EVO Hvitløksolje 100ml", description: "Håndlaget EVO Hvitløksolje 100 % italiensk. Intens smak, perfekt til bruschetta og hvitløkspasta." },
       en: { name: "EVO Garlic Oil 100ml", description: "Artisan EVO Garlic Oil 100% Italian. Intense flavor, perfect for bruschetta and garlic pasta." },
       ro: { name: "Ulei EVO cu Usturoi 100ml", description: "Ulei EVO artizanal cu usturoi 100% italian. Gust intens, perfect pentru bruschetta și paste cu usturoi." },
       es: { name: "Aceite EVO al Ajo 100ml", description: "Aceite EVO artesanal al ajo 100% italiano. Sabor intenso, perfecto para bruschetta y pasta al ajo." },
@@ -316,6 +334,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 75,
     translations: {
+      no: { name: "EVO Rosmarinolje 100ml", description: "Håndlaget EVO Rosmarinolje 100 % italiensk. Urteaktig og duftende, ideell til kjøtt og ovnsbakte grønnsaker." },
       en: { name: "EVO Rosemary Oil 100ml", description: "Artisan EVO Rosemary Oil 100% Italian. Herbaceous and fragrant, ideal for meat and roasted vegetables." },
       ro: { name: "Ulei EVO cu Rozmarin 100ml", description: "Ulei EVO artizanal cu rozmarin 100% italian. Ierburiu și parfumat, ideal pentru carne și legume la cuptor." },
       es: { name: "Aceite EVO al Romero 100ml", description: "Aceite EVO artesanal al romero 100% italiano. Herbáceo y fragante, ideal para carne y verduras asadas." },
@@ -331,6 +350,7 @@ export const products: Product[] = [
     origin: "Montefalco, Umbria",
     stock: 15,
     translations: {
+      no: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestisjefylt Montefalco Sagrantino DOCG, en fyldig og strukturert rødvin fra de umbriske åsene. Fatlagret, med en intens karakter." },
       en: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestigious Montefalco Sagrantino DOCG, a full-bodied and structured red wine from the Umbrian hills. Barrel-aged, with an intense character." },
       ro: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestigiosul Montefalco Sagrantino DOCG, un vin roșu corpolent și structurat de pe colinele umbriene. Maturat în butoi, cu un caracter intens." },
       es: { name: "Il Bisbetico Domato - Montefalco Sagrantino", description: "Prestigioso Montefalco Sagrantino DOCG, un vino tinto con cuerpo y estructurado de las colinas de Umbría. Envejecido en barrica, de carácter intenso." },
@@ -347,6 +367,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 30,
     translations: {
+      no: { name: "Mamma Mia - Passito-vin", description: "Søt og aromatisk passito-vin, omhyggelig lagret. Perfekt til desserter og modne oster. En meditasjonsvin." },
       en: { name: "Mamma Mia - Passito Wine", description: "Sweet and aromatic passito wine, carefully aged. Perfect with desserts and mature cheeses. A meditation wine." },
       ro: { name: "Mamma Mia - Vin Passito", description: "Vin passito dulce și aromat, maturat cu grijă. Perfect pentru deserturi și brânzeturi maturate. Un vin de meditație." },
       es: { name: "Mamma Mia - Vino Passito", description: "Vino passito dulce y aromático, envejecido con esmero. Perfecto para postres y quesos curados. Un vino de meditación." },
@@ -362,6 +383,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 20,
     translations: {
+      no: { name: "Musserende 48 Måneder Brut 1742", description: "Premium Brut musserende lagret i 48 måneder. Ekstraordinær kompleksitet og finesse, kremete bobler. For kjennere." },
       en: { name: "Sparkling 48 Months Brut 1742", description: "Premium Brut sparkling aged 48 months. Extraordinary complexity and finesse, creamy bubbles. For connoisseurs." },
       ro: { name: "Spumant 48 Luni Brut 1742", description: "Spumant Brut premium învechit 48 luni. Complexitate și finețe extraordinare, bule cremoase. Pentru cunoscători." },
       es: { name: "Espumoso 48 Meses Brut 1742", description: "Espumoso Brut premium envejecido 48 meses. Complejidad y finura extraordinarias, burbujas cremosas. Para conocedores." },
@@ -378,6 +400,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 30,
     translations: {
+      no: { name: "Musserende Rosé Brut 1742", description: "Elegant og fruktig Rosé Brut musserende vin. Noter av røde bær, perfekt til brunsj og spesielle aperitiffer." },
       en: { name: "Sparkling Rosé Brut 1742", description: "Elegant and fruity Rosé Brut sparkling wine. Red fruit notes, perfect for brunch and special aperitifs." },
       ro: { name: "Spumant Roze Brut 1742", description: "Vin spumant Roze Brut elegant și fructat. Note de fructe roșii, perfect pentru brunch și aperitive speciale." },
       es: { name: "Espumoso Rosado Brut 1742", description: "Vino espumoso Rosado Brut elegante y afrutado. Notas de frutos rojos, perfecto para brunch y aperitivos especiales." },
@@ -393,6 +416,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 35,
     translations: {
+      no: { name: "Musserende Brut 1742", description: "Musserende Brut etter klassisk metode. Fine og vedvarende bobler, elegant og forfinet. Perfekt til aperitiff og feiringer." },
       en: { name: "Sparkling Brut 1742", description: "Classic-method Brut sparkling wine. Fine and persistent bubbles, elegant and refined. Perfect for aperitifs and celebrations." },
       ro: { name: "Spumant Brut 1742", description: "Spumant Brut metoda clasică. Bule fine și persistente, elegant și rafinat. Perfect pentru aperitive și sărbători." },
       es: { name: "Espumoso Brut 1742", description: "Espumoso Brut método clásico. Burbujas finas y persistentes, elegante y refinado. Perfecto para aperitivos y celebraciones." },
@@ -408,6 +432,7 @@ export const products: Product[] = [
     origin: "Italia",
     stock: 40,
     translations: {
+      no: { name: "Cabernet Franc", description: "Cabernet Franc rødvin av høyeste kvalitet fra de beste italienske vingårdene. Fyldig og strukturert, med noter av røde bær." },
       en: { name: "Cabernet Franc", description: "Superior-quality Cabernet Franc red wine from the finest Italian wineries. Full-bodied and structured, with notes of red fruits." },
       ro: { name: "Cabernet Franc", description: "Vin roșu Cabernet Franc de calitate superioară de la cele mai bune crame italiene. Corpolent și structurat, cu note de fructe roșii." },
       es: { name: "Cabernet Franc", description: "Vino tinto Cabernet Franc de calidad superior de las mejores bodegas italianas. Con cuerpo y estructurado, con notas de frutos rojos." },
@@ -422,6 +447,7 @@ export const products: Product[] = [
     description: "Olio per massaggi rilassanti all'olio extravergine di oliva. Nutre la pelle e favorisce il benessere muscolare.",
     stock: 35,
     translations: {
+      no: { name: "Massasjeolje med Ekstra Virgin Olivenolje", description: "Avslappende massasjeolje med ekstra virgin olivenolje. Gir næring til huden og fremmer muskelvelvære." },
       en: { name: "Massage Oil with Extra Virgin Olive Oil", description: "Relaxing massage oil with extra virgin olive oil. Nourishes skin and promotes muscle wellness." },
       ro: { name: "Ulei de Masaj cu Ulei Extravirgin", description: "Ulei de masaj relaxant cu ulei de măsline extravirgin. Hrănește pielea și favorizează bunăstarea musculară." },
       es: { name: "Aceite de Masaje con Aceite Virgen Extra", description: "Aceite de masaje relajante con aceite de oliva virgen extra. Nutre la piel y favorece el bienestar muscular." },
@@ -436,6 +462,7 @@ export const products: Product[] = [
     description: "Latte detergente struccante delicato all'olio d'oliva. Pulisce in profondità rispettando il pH naturale della pelle.",
     stock: 50,
     translations: {
+      no: { name: "Mild Rensemelk", description: "Mild rensende sminkefjerner med olivenolje. Renser i dybden samtidig som den respekterer hudens naturlige pH." },
       en: { name: "Gentle Cleansing Milk", description: "Gentle cleansing makeup remover with olive oil. Deep cleanses while respecting skin's natural pH." },
       ro: { name: "Lapte Demachiant Delicat", description: "Lapte demachiant delicat cu ulei de măsline. Curăță în profunzime respectând pH-ul natural al pielii." },
       es: { name: "Leche Limpiadora Suave", description: "Leche limpiadora desmaquillante suave con aceite de oliva. Limpia en profundidad respetando el pH natural de la piel." },
@@ -450,6 +477,7 @@ export const products: Product[] = [
     description: "Crema corpo biologica all'olio d'oliva extravergine. Nutre e idrata la pelle in profondità, lasciandola morbida e vellutata.",
     stock: 45,
     translations: {
+      no: { name: "Økologisk Kroppskrem", description: "Økologisk kroppskrem med ekstra virgin olivenolje. Gir dyp næring og fukt til huden, og etterlater den myk og fløyelsaktig." },
       en: { name: "Organic Body Cream", description: "Organic body cream with extra virgin olive oil. Deeply nourishes and moisturizes skin, leaving it soft and velvety." },
       ro: { name: "Cremă de Corp Organică", description: "Cremă de corp organică cu ulei de măsline extravirgin. Hrănește și hidratează pielea în profunzime, lăsând-o moale și catifelată." },
       es: { name: "Crema Corporal Orgánica", description: "Crema corporal orgánica con aceite de oliva virgen extra. Nutre e hidrata la piel en profundidad, dejándola suave y aterciopelada." },
@@ -464,6 +492,7 @@ export const products: Product[] = [
     description: "Scrub viso esfoliante all'olio extravergine di oliva. Elimina le cellule morte e illumina la pelle naturalmente.",
     stock: 45,
     translations: {
+      no: { name: "Ansiktsskrubb med Ekstra Virgin Olje", description: "Eksfolierende ansiktsskrubb med ekstra virgin olivenolje. Fjerner døde celler og gir huden naturlig glød." },
       en: { name: "Face Scrub with Extra Virgin Oil", description: "Exfoliating face scrub with extra virgin olive oil. Removes dead cells and naturally illuminates skin." },
       ro: { name: "Scrub Facial cu Ulei Extravirgin", description: "Scrub facial exfoliant cu ulei de măsline extravirgin. Elimină celulele moarte și luminează natural pielea." },
       es: { name: "Exfoliante Facial con Aceite Virgen Extra", description: "Exfoliante facial con aceite de oliva virgen extra. Elimina células muertas e ilumina naturalmente la piel." },
@@ -478,6 +507,7 @@ export const products: Product[] = [
     description: "Crema viso notte rigenerante all'olio d'oliva. Ripara e rigenera la pelle durante il riposo per un risveglio luminoso.",
     stock: 40,
     translations: {
+      no: { name: "Ansiktskrem Natt", description: "Regenererende ansiktskrem for natten med olivenolje. Reparerer og fornyer huden under hvile for en strålende oppvåkning." },
       en: { name: "Night Face Cream", description: "Regenerating night face cream with olive oil. Repairs and regenerates skin during rest for a luminous awakening." },
       ro: { name: "Cremă de Față de Noapte", description: "Cremă de față de noapte regenerantă cu ulei de măsline. Repară și regenerează pielea în timpul odihnei pentru o trezire luminoasă." },
       es: { name: "Crema Facial Noche", description: "Crema facial noche regeneradora con aceite de oliva. Repara y regenera la piel durante el descanso para un despertar luminoso." },
@@ -493,6 +523,7 @@ export const products: Product[] = [
     origin: "Italy",
     stock: 60,
     translations: {
+      no: { name: "Økologisk Vegetabilsk Såpe", description: "Økologisk vegetabilsk såpe med olivenolje. Renser mildt samtidig som den respekterer hudens naturlige fuktighet." },
       en: { name: "Organic Vegetable Soap", description: "Organic vegetable soap with olive oil. Gently cleanses while respecting natural skin moisture." },
       ro: { name: "Săpun Vegetal Organic", description: "Săpun vegetal organic cu ulei de măsline. Curăță delicat respectând hidratarea naturală a pielea." },
       es: { name: "Jabón Vegetal Orgánico", description: "Jabón vegetal orgánico con aceite de oliva. Limpia suavemente respetando la hidratación natural de la piel." },
@@ -507,6 +538,7 @@ export const products: Product[] = [
     description: "Set regalo premium con i migliori 3 oli extravergini italiani in elegante confezione. Il regalo perfetto per gli amanti del buon olio.",
     stock: 20,
     translations: {
+      no: { name: "Gaveeske Italiensk Ekstra Virgin Olje", description: "Elegant gaveeske med utvalg av premium italienske oljer. Perfekt til bedriftsgaver eller spesielle anledninger." },
       en: { name: "Premium Italian Gift Box", description: "Elegant gift box with selection of premium Italian oils. Perfect for corporate gifts or special occasions." },
       ro: { name: "Cutie Cadou Italiană Premium", description: "Cutie cadou elegantă cu selecție de uleiuri italiene premium. Perfectă pentru cadouri corporative sau ocazii speciale." },
       es: { name: "Caja Regalo Italiana Premium", description: "Caja regalo elegante con selección de aceites italianos premium. Perfecta para regalos corporativos u ocasiones especiales." },
@@ -521,6 +553,7 @@ export const products: Product[] = [
     description: "Elegante confezione regalo con selezione di 3 oli extravergini e aromatizzati. Perfetta per regali aziendali o occasioni speciali.",
     stock: 25,
     translations: {
+      no: { name: "Gaveeske Ekstra Virgin & Aromatiserte", description: "Elegant gaveeske med utvalg av premium italienske oljer. Perfekt til bedriftsgaver eller spesielle anledninger." },
       en: { name: "Premium Italian Gift Box", description: "Elegant gift box with selection of premium Italian oils. Perfect for corporate gifts or special occasions." },
       ro: { name: "Cutie Cadou Italiană Premium", description: "Cutie cadou elegantă cu selecție de uleiuri italiene premium. Perfectă pentru cadouri corporative sau ocazii speciale." },
       es: { name: "Caja Regalo Italiana Premium", description: "Caja regalo elegante con selección de aceites italianos premium. Perfecta para regalos corporativos u ocasiones especiales." },
