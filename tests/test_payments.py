@@ -528,3 +528,79 @@ def test_compute_shipping_tiers():
     assert _compute_shipping(50.0, "US", settings) == 25.0
     # Paese assente -> default Italia
     assert _compute_shipping(50.0, "", settings) == 10.40
+
+
+# ─── Concorrenza: ID ordine univoci ─────────────────────────────────
+
+def test_order_id_unique_under_rapid_calls():
+    """Molti ordini creati in rapida successione devono avere ID distinti."""
+    from oro_naturale.api import _order_id
+
+    ids = [_order_id() for _ in range(20000)]
+    assert len(set(ids)) == len(ids), "collisione di ID ordine"
+    assert all(i.startswith("ON-") for i in ids)
+
+
+@requires_db
+def test_api_concurrent_checkout(clean_db, monkeypatch):
+    """Più utenti che acquistano nello stesso momento: nessuna collisione,
+    ogni ordine è salvato e isolato per utente."""
+    from aiohttp.test_utils import TestClient, TestServer
+
+    import oro_naturale.api as api
+    from oro_naturale import db as dbmod
+
+    monkeypatch.setenv("DATABASE_URL", clean_db)
+    monkeypatch.setattr(api, "build_client", lambda sk, mode, ver=None: None)
+
+    async def run():
+        class FakeBot:
+            async def send_message(self, cid, text, **kw):
+                pass
+
+        settings = SimpleNamespace(
+            telegram_bot_token=BOT_TOKEN, admin_chat_ids={42},
+            revolut_public_key="", revolut_secret_key="", revolut_mode="sandbox",
+            revolut_api_version="2024-09-01", stripe_currency="eur",
+            free_shipping_min=69.0, default_shipping=10.40,
+            paypal_email="shop@example.com", paypal_me="",
+        )
+        ctx = SimpleNamespace(settings=settings, products=[
+            {"id": "p1", "name": "Olio", "price": 12.95, "stock": 1000},
+        ])
+
+        client = TestClient(TestServer(api.build_api(ctx, FakeBot())))
+        await client.start_server()
+
+        N = 30  # 30 utenti diversi che ordinano simultaneamente
+
+        async def buy(uid: int):
+            H = {"X-Init-Data": make_init_data({"id": uid, "first_name": f"U{uid}"})}
+            r = await client.post("/orders", headers=H, json={
+                "payment_method": "paypal",
+                "items": [{"id": "p1", "quantity": (uid % 3) + 1}],
+                "shipping": {"name": f"U{uid}", "phone": "+39", "address": "Via 1",
+                             "city": "Perugia", "zip": "06100", "country": "IT"},
+            })
+            assert r.status == 200, f"utente {uid} ha ricevuto {r.status}"
+            return (await r.json())["order_id"]
+
+        # Esecuzione concorrente
+        oids = await asyncio.gather(*[buy(1000 + i) for i in range(N)])
+
+        # Tutti gli ID sono unici e tutti gli ordini sono nel DB
+        assert len(set(oids)) == N, "ID ordine duplicati sotto carico concorrente"
+        for i in range(N):
+            orders = await asyncio.to_thread(dbmod.list_user_orders, 1000 + i, database_url=clean_db)
+            assert len(orders) == 1, f"utente {1000+i} dovrebbe avere 1 ordine"
+            assert orders[0]["id"] in oids
+
+        # L'admin vede tutti e 30 gli ordini
+        AH = {"X-Init-Data": make_init_data({"id": 42, "first_name": "Admin"})}
+        r = await client.get("/admin/orders", headers=AH)
+        admin_ids = {o["id"] for o in (await r.json())["orders"]}
+        assert set(oids) <= admin_ids
+
+        await client.close()
+
+    asyncio.run(run())

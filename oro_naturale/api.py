@@ -18,7 +18,9 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
+import secrets
 import time
 from typing import Any
 
@@ -30,9 +32,16 @@ from .webauth import validate_init_data
 
 logger = logging.getLogger(__name__)
 
+# Sequenza monotona (atomica per il GIL) + tag casuale per processo/istanza:
+# garantisce ID ordine univoci anche con più utenti che acquistano nello stesso
+# istante — `next()` è strettamente crescente e `_PROC_TAG` distingue i riavvii
+# e le eventuali repliche. L'id è PRIMARY KEY.
+_ORDER_SEQ = itertools.count(1)
+_PROC_TAG = secrets.token_hex(2).upper()
+
 
 def _order_id() -> str:
-    return f"ON-{int(time.time())}-{int(time.time() * 1000) % 1000:03d}"
+    return f"ON-{int(time.time())}-{_PROC_TAG}-{next(_ORDER_SEQ):06d}"
 
 
 # Fasce di spedizione allineate a biomarketshop.com.
