@@ -1,4 +1,5 @@
 import type { Category, Product } from "../types";
+import rossi500ml from "../assets/rossi-500ml.jpg";
 
 // Catalogo sincronizzato da biomarketshop.com (base44). Prezzi in EUR.
 // I nomi/descrizioni base sono in italiano; le traduzioni en/ro/es sono in `translations`.
@@ -123,7 +124,7 @@ export const products: Product[] = [
     name: "Olio Extravergine di Oliva 'ROSSI' 500ml",
     category: "extra_virgin_olive_oil",
     price: 15.95,
-    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/690def7378e8f85386a1132d/a41e14b29_rossi.jpg",
+    image: rossi500ml,
     description: "L'olio extravergine di oliva Rossi 100% italiano: un'eccellenza ottenuta da olive Leccino, Moraiolo e Frantoio, raccolte a mano per preservarne qualità e integrità. Un olio italiano naturale e genuino, ideale sia a tavola che in cucina, perfetto anche per le cotture grazie al suo gusto equilibrato e alla sua qualità superiore.",
     volume: "500ml",
     origin: "Umbria, Italia",
