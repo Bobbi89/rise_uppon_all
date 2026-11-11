@@ -17,6 +17,8 @@ type Props = {
   error: string | null;
   revolutEnabled: boolean;
   paypalEnabled: boolean;
+  freeShippingMin?: number;
+  defaultShipping?: number;
   onClose: () => void;
   onPay: (details: ShippingDetails, method: PayChoice) => void;
 };
@@ -33,6 +35,8 @@ export function CheckoutSheet({
   error,
   revolutEnabled,
   paypalEnabled,
+  freeShippingMin,
+  defaultShipping,
   onClose,
   onPay,
 }: Props) {
@@ -44,15 +48,18 @@ export function CheckoutSheet({
   const [zip, setZip] = useState("");
   const [country, setCountry] = useState("IT");
   const [notes, setNotes] = useState("");
-  const [method, setMethod] = useState<PayChoice>(revolutEnabled ? "revolut" : "paypal");
+  const [preferredMethod, setMethod] = useState<PayChoice>(revolutEnabled ? "revolut" : "paypal");
 
-  const shipping = shippingFor(subtotal, country);
+  const method: PayChoice = preferredMethod === "revolut"
+    ? (revolutEnabled ? "revolut" : "paypal")
+    : (paypalEnabled ? "paypal" : "revolut");
+  const shipping = shippingFor(subtotal, country, freeShippingMin, defaultShipping);
   const total = subtotal + shipping;
   const valid = name.trim() && phone.trim() && address.trim() && city.trim() && zip.trim();
   const noPayment = !revolutEnabled && !paypalEnabled;
 
   function submit() {
-    if (!valid || processing) return;
+    if (!valid || processing || noPayment || !items.length) return;
     onPay(
       {
         name: name.trim(),
@@ -109,7 +116,7 @@ export function CheckoutSheet({
           <input className={inputClass} placeholder={t("addressLine")} value={address} disabled={processing} onChange={(e) => setAddress(e.target.value)} />
           <div className="flex gap-2.5">
             <input className={inputClass} placeholder={t("city")} value={city} disabled={processing} onChange={(e) => setCity(e.target.value)} />
-            <input className={`${inputClass} max-w-[110px]`} placeholder={t("zip")} inputMode="numeric" value={zip} disabled={processing} onChange={(e) => setZip(e.target.value)} />
+            <input className={`${inputClass} max-w-[110px]`} placeholder={t("zip")} autoComplete="postal-code" value={zip} disabled={processing} onChange={(e) => setZip(e.target.value)} />
           </div>
           <select
             className={inputClass}
@@ -179,7 +186,7 @@ export function CheckoutSheet({
 
         <div className="safe-bottom mt-4">
           <button
-            disabled={!valid || processing}
+            disabled={!valid || processing || noPayment || !items.length}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-olive-900 py-3.5 text-sm font-extrabold text-cream active:scale-[0.98]"
             onClick={submit}
           >

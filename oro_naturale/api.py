@@ -90,7 +90,8 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
     async def _read_body(request: web.Request) -> dict:
         if request.can_read_body:
             try:
-                return await request.json()
+                body = await request.json()
+                return body if isinstance(body, dict) else {}
             except Exception:
                 return {}
         return {}
@@ -147,18 +148,28 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
 
         items_in = body.get("items") or []
         shipping_in = body.get("shipping") or {}
-        if not items_in:
+        if not isinstance(items_in, list) or not items_in:
             return web.json_response({"error": "carrello vuoto"}, status=400)
 
+        if not isinstance(shipping_in, dict) or not isinstance(shipping_in.get("country", "IT"), str):
+            return web.json_response({"error": "spedizione non valida"}, status=400)
         index = _price_index(ctx.products)
         items: list[dict] = []
         subtotal = 0.0
+        quantities: dict[str, int] = {}
         for it in items_in:
+            if not isinstance(it, dict):
+                return web.json_response({"error": "articolo non valido"}, status=400)
             pid = str(it.get("id", ""))
-            qty = max(1, int(it.get("quantity", 1)))
+            qty = it.get("quantity", 1)
+            if type(qty) is not int or qty < 1:
+                return web.json_response({"error": "quantità non valida"}, status=400)
             prod = index.get(pid)
             if not prod:
                 return web.json_response({"error": f"prodotto non valido: {pid}"}, status=400)
+            quantities[pid] = quantities.get(pid, 0) + qty
+            if quantities[pid] > prod["stock"]:
+                return web.json_response({"error": "disponibilità insufficiente", "product_id": pid}, status=409)
             line = round(prod["price"] * qty, 2)
             subtotal += line
             items.append({"id": pid, "name": prod["name"], "price": prod["price"], "quantity": qty})
@@ -170,6 +181,15 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
         currency = (settings.stripe_currency or "eur").upper()
         oid = _order_id()
 
+        payment_method = body.get("payment_method") or "revolut"
+        if not isinstance(payment_method, str) or payment_method.lower() not in {"paypal", "revolut"}:
+            return web.json_response({"error": "metodo di pagamento non valido"}, status=400)
+        payment_method = payment_method.lower()
+        if payment_method == "revolut" and not (settings.revolut_secret_key and settings.revolut_public_key):
+            return web.json_response({"error": "Revolut non configurato"}, status=503)
+        if payment_method == "paypal" and not settings.paypal_email:
+            return web.json_response({"error": "PayPal non configurato"}, status=503)
+
         # Aggiorna/crea il profilo cliente con i dati di spedizione
         await asyncio.to_thread(
             db.upsert_customer, int(user["id"]),
@@ -179,7 +199,6 @@ def build_api(ctx: Any, bot: Any = None) -> web.Application:
             city=shipping_in.get("city"), zip_code=shipping_in.get("zip"),
         )
 
-        payment_method = (body.get("payment_method") or "revolut").lower()
         base_order = {
             "id": oid, "user_id": int(user["id"]), "username": user.get("username"),
             "items": items, "subtotal": subtotal, "shipping": shipping, "total": total,

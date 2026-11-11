@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from pathlib import Path
 
 from aiohttp import web
@@ -48,6 +49,19 @@ def build_web_app(ctx: object | None = None, bot: object | None = None) -> web.A
     app = web.Application()
     app.router.add_get("/", _index)
     app.router.add_get("/health", _health)
+
+    async def ready(_request: web.Request) -> web.Response:
+        from . import db
+        checks = {"frontend": (WEB_DIST / "index.html").is_file(), "database": False}
+        try:
+            checks["database"] = await asyncio.to_thread(db.check_ready)
+        except Exception:
+            logger.warning("Database readiness check failed")
+        ok = all(checks.values())
+        return web.json_response({"status": "ok" if ok else "unavailable", "checks": checks},
+                                 status=200 if ok else 503)
+
+    app.router.add_get("/ready", ready)
 
     # API della Mini App (ordini, pagamenti Revolut, profilo, admin)
     if ctx is not None:
