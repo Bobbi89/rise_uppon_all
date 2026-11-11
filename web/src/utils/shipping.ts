@@ -14,11 +14,11 @@ export const NORDIC_SHIPPING = 14;
 export const WORLD_SHIPPING = 25;
 
 /** Costo di spedizione per subtotale e paese (ISO-2). */
-export function shippingFor(subtotal: number, country = "IT"): number {
-  if (subtotal >= FREE_SHIPPING_MIN) return 0;
+export function shippingFor(subtotal: number, country = "IT", freeShippingMin = FREE_SHIPPING_MIN, defaultShipping = EUROPE_SHIPPING): number {
+  if (subtotal >= freeShippingMin) return 0;
   const c = (country || "IT").toUpperCase();
   if (NORDIC.includes(c)) return NORDIC_SHIPPING;
-  if (EUROPE.includes(c)) return EUROPE_SHIPPING;
+  if (EUROPE.includes(c)) return defaultShipping;
   return WORLD_SHIPPING;
 }
 

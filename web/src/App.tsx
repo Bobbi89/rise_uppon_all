@@ -66,7 +66,7 @@ export default function App() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   // Stima Italia; al checkout viene ricalcolata in base al paese scelto.
-  const shipping = cart.length === 0 ? 0 : shippingFor(subtotal, "IT");
+  const shipping = cart.length === 0 ? 0 : shippingFor(subtotal, "IT", config?.free_shipping_min, config?.default_shipping);
   const total = subtotal + shipping;
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -276,6 +276,8 @@ export default function App() {
         error={checkoutError}
         revolutEnabled={config?.revolut_enabled ?? false}
         paypalEnabled={config?.paypal_enabled ?? false}
+        freeShippingMin={config?.free_shipping_min}
+        defaultShipping={config?.default_shipping}
         onClose={() => {
           if (!processing) setCheckoutOpen(false);
         }}

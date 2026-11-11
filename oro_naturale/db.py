@@ -42,6 +42,19 @@ def _conn(database_url: str | None = None) -> Iterator[Any]:
         conn.close()
 
 
+def check_ready() -> bool:
+    """Bounded, read-only readiness probe; verifies required tables are queryable."""
+    conn = psycopg2.connect(_database_url(), connect_timeout=3,
+                            options="-c statement_timeout=2000")
+    try:
+        with conn.cursor() as cur:
+            for table in ("products", "customers", "orders"):
+                cur.execute(f"SELECT 1 FROM {table} LIMIT 0")
+        return True
+    finally:
+        conn.close()
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  SCHEMA
 # ═══════════════════════════════════════════════════════════════════

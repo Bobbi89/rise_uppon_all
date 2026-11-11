@@ -103,7 +103,7 @@ except Exception as e:
 # ==========================================
 def migrate_products():
     """
-    Esegue la migrazione dei prodotti da products.json al database PostgreSQL.
+    Inserisce solo prodotti mancanti da products.json, preservando quelli esistenti.
     Viene chiamata all'avvio del bot.
     """
     try:
@@ -141,20 +141,7 @@ def migrate_products():
                     stock, featured, is_sample, details, translations,
                     created_date, updated_date, created_by_id
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    description = EXCLUDED.description,
-                    price = EXCLUDED.price,
-                    image_url = EXCLUDED.image_url,
-                    category = EXCLUDED.category,
-                    stock = EXCLUDED.stock,
-                    featured = EXCLUDED.featured,
-                    is_sample = EXCLUDED.is_sample,
-                    details = EXCLUDED.details,
-                    translations = EXCLUDED.translations,
-                    created_date = EXCLUDED.created_date,
-                    updated_date = EXCLUDED.updated_date,
-                    created_by_id = EXCLUDED.created_by_id
+                ON CONFLICT (id) DO NOTHING
             """, (
                 p.get("id"),
                 name,

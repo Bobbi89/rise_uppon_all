@@ -241,3 +241,22 @@ La versione attiva ora è modulare:
 - `oro_naturale/services.py` ordini, Stripe, follow-up
 - `oro_naturale/routers/public.py` flusso clienti
 - `oro_naturale/routers/admin.py` pannello privato
+
+### Checkout e controlli operativi
+
+- Il caricamento iniziale di `products.json` inserisce solo ID nuovi. Prezzi,
+  stock e dettagli già presenti nel database non vengono sovrascritti al riavvio.
+  Le modifiche ai prodotti esistenti vanno applicate esplicitamente al database.
+- Il checkout rifiuta quantità non intere/positive e richieste oltre lo stock
+  del catalogo caricato, sommando anche righe duplicate. Questo controllo non
+  costituisce una prenotazione atomica dello stock tra acquisti concorrenti.
+- Un metodo di pagamento non configurato viene rifiutato prima di scrivere dati.
+- `/health` verifica che il processo risponda; `/ready` restituisce 200 solo se
+  `web/dist/index.html` esiste e le tabelle products/customers/orders sono
+  interrogabili. Altrimenti restituisce 503 senza dettagli di connessione.
+  Non verifica le credenziali del provider di pagamento.
+- La Mini App usa soglia gratuita e tariffa standard restituite da `/api/config`.
+
+Verifica locale: `python -m pytest tests -q` e `npm --prefix web run build`.
+I test PostgreSQL richiedono un database **dedicato ai test** in
+`TEST_DATABASE_URL`; senza di esso vengono saltati.
